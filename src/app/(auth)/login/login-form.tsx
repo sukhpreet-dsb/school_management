@@ -13,6 +13,8 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { authClient } from '@/lib/auth-client';
+import { roleHomePath } from '@/mock/nav';
+import { normalizeRole } from '@/lib/roles';
 import {
   Field,
   FieldError,
@@ -73,7 +75,7 @@ export function LoginForm({
 
       form.reset();
       toast.success('Welcome back!');
-      router.push('/dashboard');
+      router.push(roleHomePath(normalizeRole(data.user.role)));
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Login failed. Please try again.'

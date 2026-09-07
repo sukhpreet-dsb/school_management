@@ -11,5 +11,20 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql'
   }),
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          let role = 'student';
+
+          if ((await prisma.user.count()) === 0) {
+            role = 'admin';
+          }
+
+          return { data: { ...user, role } };
+        }
+      }
+    }
+  },
   plugins: [admin(), nextCookies()]
 });

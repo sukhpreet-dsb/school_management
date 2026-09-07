@@ -7,9 +7,10 @@
     "build": "bunx --bun prisma generate && next build",
     "start": "bunx --bun prisma migrate deploy && next start",
     "lint": "eslint",
-    "generate":"bunx prisma generate",
-    "migrate":"bunx prisma migrate dev",
-    "studio":"bunx prisma studio"
+    "generate": "bunx prisma generate",
+    "migrate": "bunx prisma migrate dev",
+    "studio": "bunx prisma studio",
+    "db:seed": "bun prisma/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -48,7 +49,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "eslint": "^10.6.0",
+    "eslint": "^9",
     "eslint-config-next": "^16.2.10",
     "prettier": "^3.9.5",
     "prettier-plugin-tailwindcss": "^0.8.0",
