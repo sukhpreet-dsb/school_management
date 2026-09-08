@@ -227,7 +227,7 @@ Each module is:
 - Multi-school **tenancy** (Better Auth organizations plugin).
 - **File uploads** (student/teacher avatars, S3/R2, signed URLs).
 - **Timetable** scheduling with drag-and-drop (dnd-kit — already installed).
-- **Transactional emails** (react-email + resend — already installed) for welcome / reports.
+- **Transactional emails** (react-email + resend — already installed) for welcome / reports. Password reset flow is already wired: `/forgot-password` → Resend email → `/reset-password?token=`.
 - **Caching & performance** (Next.js ISR, `revalidateTag`, memoization).
 - **Testing** (Vitest + Supertest) for server actions and APIs.
 

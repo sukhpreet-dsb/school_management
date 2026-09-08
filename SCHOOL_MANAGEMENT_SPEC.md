@@ -20,7 +20,7 @@ Manage a single school's students, teachers, classes, subjects, enrollments, gra
 - No multi-school/tenancy.
 - No fees/payments, timetable, exams, homework, notices.
 - No file uploads.
-- No email sending (welcome/verification) — auth email flows come for free with Better Auth if configured.
+- No email sending (welcome/verification) beyond password reset — verification emails come for free with Better Auth if configured.
 
 ### Conventions
 - IDs: lowercase UUID strings (`@default(uuid())`).
