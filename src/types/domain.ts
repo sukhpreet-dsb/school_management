@@ -15,12 +15,14 @@ export interface AuthUser {
   emailVerified: boolean;
   banned: boolean;
   createdAt: string;
+  classCount?: number;
   profile?: {
     empCode?: string;
     phone?: string | null;
     hireDate?: string | null;
     designation?: string | null;
     admissionNo?: string;
+    classCount?: number;
   };
 }
 
@@ -84,6 +86,16 @@ export interface SchoolClass {
   room: string | null;
   classTeacher: { id: string; name: string } | null;
   subjects: ClassSubject[];
+  studentCount: number;
+}
+
+export interface ClassCatalogItem {
+  id: string;
+  grade: number;
+  section: string;
+  name: string;
+  room: string | null;
+  academicYear: string;
   studentCount: number;
 }
 

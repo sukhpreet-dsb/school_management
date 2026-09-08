@@ -34,6 +34,21 @@ export interface DataTableProps<TData, TValue> {
   toolbar?: React.ReactNode
   emptyMessage?: string
   searchPlaceholder?: string
+  /**
+   * "client" (default): paginate + filter the fetched array in the browser.
+   * "server": the parent owns the page/pageSize/search state and refetches;
+   * this component renders the current page and reports changes via callbacks.
+   */
+  mode?: "client" | "server"
+  /** Server mode: 1-based current page. */
+  page?: number
+  /** Server mode: the search value the parent is currently fetching with. */
+  search?: string
+  /** Server mode: total rows across all pages. */
+  total?: number
+  onPageChange?: (page: number) => void
+  onPageSizeChange?: (pageSize: number) => void
+  onSearchChange?: (search: string) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -43,31 +58,95 @@ export function DataTable<TData, TValue>({
   pageSize = 10,
   toolbar,
   emptyMessage = "No records found.",
-  searchPlaceholder = "Search…"
+  searchPlaceholder = "Search…",
+  mode = "client",
+  page = 1,
+  search = "",
+  total = 0,
+  onPageChange,
+  onPageSizeChange,
+  onSearchChange
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [search, setSearch] = React.useState("")
+  const [query, setQuery] = React.useState("")
+  const serverMode = mode === "server"
+
+  // Server mode: keep the input responsive while the parent debounces the
+  // applied search. Re-sync when the parent's value actually changes.
+  const [input, setInput] = React.useState(search)
+  const [prevSearch, setPrevSearch] = React.useState(search)
+  if (serverMode && prevSearch !== search) {
+    setPrevSearch(search)
+    setInput(search)
+  }
+
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  React.useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
+
+  function handleInputChange(value: string) {
+    if (!serverMode) {
+      setQuery(value)
+      return
+    }
+    setInput(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => onSearchChange?.(value), 300)
+  }
 
   const filteredData = React.useMemo(() => {
-    if (!searchKey || !search.trim()) return data
-    const query = search.toLowerCase()
+    if (serverMode || !searchKey || !query.trim()) return data
+    const q = query.toLowerCase()
     return data.filter((row) =>
       String((row as Record<string, unknown>)[searchKey] ?? "")
         .toLowerCase()
-        .includes(query)
+        .includes(q)
     )
-  }, [data, search, searchKey])
+  }, [data, searchKey, query, serverMode])
 
   const table = useReactTable({
     data: filteredData,
     columns,
-    state: { sorting },
+    state: {
+      sorting,
+      ...(serverMode ? { pagination: { pageIndex: Math.max(0, page - 1), pageSize } } : {})
+    },
     onSortingChange: setSorting,
+    onPaginationChange: (updater) => {
+      if (!serverMode || !onPageChange) return
+      const current = { pageIndex: Math.max(0, page - 1), pageSize }
+      const next = typeof updater === "function" ? updater(current) : updater
+      if (next.pageSize !== current.pageSize && onPageSizeChange) {
+        onPageSizeChange(next.pageSize)
+      }
+      if (typeof next.pageIndex === "number" && next.pageIndex !== current.pageIndex) {
+        onPageChange(next.pageIndex + 1)
+      }
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize } }
+    ...(serverMode
+      ? {
+          manualPagination: true,
+          manualFiltering: true,
+          rowCount: total,
+          pageCount: pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1
+        }
+      : {
+          getPaginationRowModel: getPaginationRowModel(),
+          initialState: { pagination: { pageSize } }
+        })
   })
+
+  const pageIndex = table.getState().pagination.pageIndex
+  const perPage = table.getState().pagination.pageSize
+  const totalCount = serverMode ? total : filteredData.length
+  const from = totalCount === 0 ? 0 : pageIndex * perPage + 1
+  const to = Math.min((pageIndex + 1) * perPage, totalCount)
 
   return (
     <div data-slot="data-table" className="flex flex-col gap-3">
@@ -77,8 +156,8 @@ export function DataTable<TData, TValue>({
             <div className="relative w-full max-w-64">
               <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
               <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                value={serverMode ? input : query}
+                onChange={(event) => handleInputChange(event.target.value)}
                 placeholder={searchPlaceholder}
                 className="pl-8"
               />
@@ -99,11 +178,11 @@ export function DataTable<TData, TValue>({
                     ? table.getState().sorting.find((s) => s.id === header.id)?.desc === undefined
                       ? null
                       : table.getState().sorting.find((s) => s.id === header.id)?.desc
-                      ? "desc"
-                      : "asc"
+                        ? "desc"
+                        : "asc"
                     : null
                   return (
-                    <TableHead key={header.id} className={cn(header.column.getSize() !== 150 && header.column.id !== "actions" && "min-w-24")}>
+                    <TableHead key={header.id}>
                       <button
                         type="button"
                         disabled={!isSortable}
@@ -156,15 +235,10 @@ export function DataTable<TData, TValue>({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
           <span>
-            Showing {filteredData.length === 0 ? 0 : table.getState().pagination.pageIndex * pageSize + 1}–
-            {Math.min(
-              (table.getState().pagination.pageIndex + 1) * pageSize,
-              filteredData.length
-            )}{" "}
-            of {filteredData.length}
+            Showing {from}–{to} of {totalCount}
           </span>
           <Select
-            value={String(table.getState().pagination.pageSize)}
+            value={String(perPage)}
             onChange={(event) => table.setPageSize(Number(event.target.value))}
             className="h-7 w-20 text-xs"
             aria-label="Rows per page"
@@ -188,8 +262,7 @@ export function DataTable<TData, TValue>({
             <span>Prev</span>
           </Button>
           <span className="text-muted-foreground px-1 text-sm">
-            Page {table.getState().pagination.pageIndex + 1} /{" "}
-            {table.getPageCount()}
+            Page {table.getState().pagination.pageIndex + 1} / {table.getPageCount()}
           </span>
           <Button
             variant="outline"

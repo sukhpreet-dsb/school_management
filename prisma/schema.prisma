@@ -29,15 +29,16 @@ model User {
 }
 
 model Teacher {
-  id          String    @id @default(uuid())
-  userId      String    @unique
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  empCode     String    @unique
+  id          String        @id @default(uuid())
+  userId      String        @unique
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  empCode     String        @unique
   phone       String?
   hireDate    DateTime?
   designation String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  classes     TeacherClass[]
 
   @@map("teacher")
 }
@@ -64,6 +65,34 @@ enum Gender {
   OTHER
 
   @@map("gender")
+}
+
+model Class {
+  id           String         @id @default(uuid())
+  grade        Int
+  section      String         @default("A")
+  room         String?
+  academicYear String         @default("2026-2027")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  assignments  TeacherClass[]
+
+  @@unique([grade, section, academicYear])
+  @@map("class")
+}
+
+model TeacherClass {
+  id           String   @id @default(uuid())
+  teacherId    String
+  teacher      Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classId      String
+  class        Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  academicYear String   @default("2026-2027")
+  createdAt    DateTime @default(now())
+
+  @@unique([teacherId, classId, academicYear])
+  @@index([teacherId, academicYear])
+  @@map("teacher_class")
 }
 
 model Session {

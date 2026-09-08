@@ -22,6 +22,7 @@ function toAuthUser(user: {
     phone: string | null;
     hireDate: Date | null;
     designation: string | null;
+    _count?: { classes: number };
   } | null;
   studentProfile?: { admissionNo: string } | null;
 }): AuthUser {
@@ -43,11 +44,14 @@ function toAuthUser(user: {
             empCode: user.teacherProfile.empCode,
             phone: user.teacherProfile.phone,
             hireDate: user.teacherProfile.hireDate?.toISOString() ?? null,
-            designation: user.teacherProfile.designation
+            designation: user.teacherProfile.designation,
+            classCount: user.teacherProfile._count?.classes ?? 0
           }
         : normalized === 'student' && user.studentProfile
           ? { admissionNo: user.studentProfile.admissionNo }
-          : undefined
+          : undefined,
+    classCount:
+      normalized === 'teacher' ? user.teacherProfile?._count?.classes ?? 0 : undefined
   };
 }
 
@@ -87,7 +91,10 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
-        include: { teacherProfile: true, studentProfile: true }
+        include: {
+          teacherProfile: { include: { _count: { select: { classes: true } } } },
+          studentProfile: true
+        }
       }),
       prisma.user.count({ where })
     ]);

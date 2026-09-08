@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AlertTriangleIcon, Users } from 'lucide-react';
@@ -8,6 +9,7 @@ import { DataTable } from '@/components/data-table/data-table';
 import { Spinner } from '@/components/ui/spinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useMyClasses } from '@/lib/queries';
+import { useSafePage } from '@/lib/use-safe-page';
 import type { TeacherClassSummary } from '@/types/domain';
 
 const columns: ColumnDef<TeacherClassSummary>[] = [
@@ -36,7 +38,10 @@ const columns: ColumnDef<TeacherClassSummary>[] = [
 ];
 
 export function MyClasses() {
-  const classes = useMyClasses();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const classes = useMyClasses({ page, pageSize });
+  const safePage = useSafePage(page, classes.data?.totalPages, setPage);
 
   if (classes.isError) {
     return (
@@ -58,8 +63,17 @@ export function MyClasses() {
 
   return (
     <DataTable
+      mode='server'
       columns={columns}
       data={classes.data?.items ?? []}
+      total={classes.data?.total ?? 0}
+      page={safePage}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={(size) => {
+        setPageSize(size);
+        setPage(1);
+      }}
       emptyMessage='You are not assigned to any classes yet.'
     />
   );

@@ -21,14 +21,16 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import {
-  Sheet,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useCreateTeacher, useTeachersList } from '@/lib/queries';
+import { useCreateTeacher, useTeachers } from '@/lib/queries';
+import { useSafePage } from '@/lib/use-safe-page';
+import { AssignClassesSheet } from '@/components/admin/assign-classes-sheet';
 import type { AuthUser } from '@/types/domain';
 
 const columns: ColumnDef<AuthUser>[] = [
@@ -51,6 +53,16 @@ const columns: ColumnDef<AuthUser>[] = [
     cell: ({ row }) => row.original.profile?.phone ?? '—'
   },
   {
+    accessorKey: 'classCount',
+    header: 'Classes',
+    cell: ({ row }) => row.original.classCount ?? row.original.profile?.classCount ?? 0
+  },
+  {
+    id: 'actions',
+    header: '',
+    cell: ({ row }) => <AssignAction user={row.original} />
+  },
+  {
     accessorKey: 'banned',
     header: 'Status',
     cell: ({ row }) =>
@@ -69,6 +81,28 @@ const columns: ColumnDef<AuthUser>[] = [
       })
   }
 ];
+
+function AssignAction({ user }: { user: AuthUser }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        variant='outline'
+        size='sm'
+        onClick={() => setOpen(true)}
+        className='whitespace-nowrap'
+      >
+        Assign classes
+      </Button>
+      <AssignClassesSheet
+        open={open}
+        onOpenChange={setOpen}
+        teacherId={user.id}
+        teacherName={user.name}
+      />
+    </>
+  );
+}
 
 const createTeacherSchema = z.object({
   name: z
@@ -90,9 +124,14 @@ type CreateTeacherValues = z.infer<typeof createTeacherSchema>;
 export function TeachersManager() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useState('');
 
-  const teachers = useTeachersList();
+  const teachers = useTeachers({ page, pageSize, q: search || undefined });
   const createTeacher = useCreateTeacher();
+
+  const safePage = useSafePage(page, teachers.data?.totalPages, setPage);
 
   const form = useForm<CreateTeacherValues>({
     resolver: zodResolver(createTeacherSchema),
@@ -123,6 +162,7 @@ export function TeachersManager() {
       toast.success(`Teacher created. Temp password: ${values.password}`);
       form.reset();
       setOpen(false);
+      setPage(1);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to create teacher. Try again.'
@@ -150,10 +190,24 @@ export function TeachersManager() {
         </div>
       ) : (
         <DataTable
+          mode='server'
           columns={columns}
           data={teachers.data?.items ?? []}
+          total={teachers.data?.total ?? 0}
+          page={safePage}
+          pageSize={pageSize}
+          search={search}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          onSearchChange={(q) => {
+            setSearch(q);
+            setPage(1);
+          }}
           searchKey='email'
-          searchPlaceholder='Search by email…'
+          searchPlaceholder='Search by email or name…'
           emptyMessage='No teachers yet. Add one to get started.'
           toolbar={
             <Button size='sm' onClick={() => setOpen(true)}>
@@ -164,15 +218,15 @@ export function TeachersManager() {
         />
       )}
 
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setOpen}>
         <form id='add-teacher-form' onSubmit={form.handleSubmit(onSubmit)}>
-          <SheetHeader>
-            <SheetTitle>Add teacher</SheetTitle>
-            <SheetDescription>
+          <DialogHeader>
+            <DialogTitle>Add teacher</DialogTitle>
+            <DialogDescription>
               Creates a teacher account. Share the temporary password with the
               teacher after saving.
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           <div className='flex flex-col gap-5 py-2'>
             {error && (
@@ -297,7 +351,7 @@ export function TeachersManager() {
             </FieldGroup>
           </div>
 
-          <SheetFooter>
+          <DialogFooter>
             <Button
               type='button'
               variant='outline'
@@ -313,9 +367,9 @@ export function TeachersManager() {
             >
               {createTeacher.isPending ? <Spinner /> : 'Create teacher'}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </Sheet>
+      </Dialog>
     </div>
   );
 }

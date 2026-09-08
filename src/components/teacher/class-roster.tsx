@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AlertTriangleIcon, ArrowLeft } from 'lucide-react';
@@ -38,7 +39,11 @@ export function ClassRoster({
   classId: string;
   className: string;
 }) {
-  const roster = useClassEnrollments(classId);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useState('');
+
+  const roster = useClassEnrollments(classId, { page, pageSize, q: search || undefined });
 
   return (
     <div className='flex flex-col gap-4'>
@@ -66,8 +71,22 @@ export function ClassRoster({
         </div>
       ) : (
         <DataTable
+          mode='server'
           columns={columns}
-          data={roster.data ?? []}
+          data={roster.data?.items ?? []}
+          total={roster.data?.total ?? 0}
+          page={page}
+          pageSize={pageSize}
+          search={search}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          onSearchChange={(q) => {
+            setSearch(q);
+            setPage(1);
+          }}
           searchKey='name'
           searchPlaceholder='Search students…'
           emptyMessage='No students are enrolled in this class.'

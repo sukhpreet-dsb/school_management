@@ -5,7 +5,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     <div data-slot="table-container" className="w-full overflow-x-auto">
       <table
         data-slot="table"
-        className={cn("text-foreground w-full text-sm table-fixed", className)}
+        className={cn("text-foreground w-full text-sm table-auto", className)}
         {...props}
       />
     </div>
@@ -56,7 +56,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "text-muted-foreground h-10 flex-1 px-2 text-left align-middle font-medium whitespace-nowrap [&>[data-slot=input]]:bg-muted [&>[data-slot=input]]:border-0",
+        "text-muted-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&>[data-slot=input]]:bg-muted [&>[data-slot=input]]:border-0",
         className
       )}
       {...props}

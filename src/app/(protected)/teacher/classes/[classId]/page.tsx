@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { requireRole } from '@/server/auth';
-import { getTeacherForUser, getTeacherStats } from '@/mock/data';
+import { getTeacherAssignment } from '@/server/teacher';
 import { PageHeader } from '@/components/layout/page-header';
 import { ClassRoster } from '@/components/teacher/class-roster';
 
@@ -12,25 +12,20 @@ export default async function TeacherClassRosterPage({
   const session = await requireRole('teacher');
   const { classId } = await params;
 
-  const teacher = getTeacherForUser({ email: session.user.email });
-  const ownsClass =
-    teacher && getTeacherStats(teacher.id).myClasses.some((c) => c.id === classId);
+  const assignment = await getTeacherAssignment({ email: session.user.email });
+  const target = assignment?.assignedClasses.find((c) => c.classId === classId);
 
-  if (!ownsClass) {
+  if (!target) {
     notFound();
   }
-
-  const className = getTeacherStats(teacher!.id).myClasses.find(
-    (c) => c.id === classId
-  )!.name;
 
   return (
     <>
       <PageHeader
-        title={className}
+        title={target.name}
         description='Students enrolled in this class this academic year.'
       />
-      <ClassRoster classId={classId} className={className} />
+      <ClassRoster classId={classId} className={target.name} />
     </>
   );
 }
