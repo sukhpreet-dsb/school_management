@@ -9,8 +9,7 @@
     "lint": "eslint",
     "generate": "bunx prisma generate",
     "migrate": "bunx prisma migrate dev",
-    "studio": "bunx prisma studio",
-    "db:seed": "bun prisma/seed.ts"
+    "studio": "bunx prisma studio"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -21,6 +20,8 @@
     "@hookform/resolvers": "^5.4.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@tanstack/react-query": "^5.102.8",
+    "@tanstack/react-query-devtools": "^5.102.8",
     "@tanstack/react-table": "^8.21.3",
     "better-auth": "^1.6.23",
     "class-variance-authority": "^0.7.1",

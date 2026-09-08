@@ -1,5 +1,7 @@
 "use client"
 
+import * as React from "react"
+
 import {
   Area,
   AreaChart,
@@ -10,7 +12,6 @@ import {
   Legend,
   Pie,
   PieChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
@@ -57,6 +58,42 @@ function ChartCard({
   )
 }
 
+function ChartContainer({ children }: { children: React.ReactNode }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const [size, setSize] = React.useState({ width: 0, height: 0 })
+
+  React.useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect
+        if (width > 0 && height > 0) {
+          setSize({ width, height })
+        }
+      }
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  if (size.width === 0 || size.height === 0) {
+    return <div ref={ref} className="h-full w-full" />
+  }
+
+  const child = React.Children.only(children) as React.ReactElement<{
+    width?: number
+    height?: number
+  }>
+
+  return (
+    <div ref={ref} className="h-full w-full">
+      {React.cloneElement(child, { width: size.width, height: size.height })}
+    </div>
+  )
+}
+
 export function AdminOverviewCharts({ stats }: { stats: AdminStats }) {
   const attendance = [
     { name: "Present", value: stats.attendanceBreakdown.present },
@@ -70,7 +107,7 @@ export function AdminOverviewCharts({ stats }: { stats: AdminStats }) {
       <div className="md:col-span-2">
         <ChartCard title="Enrollment trend" description="Active students over the last five academic years">
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer>
               <AreaChart data={stats.enrollmentByYear} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="enroll" x1="0" y1="0" x2="0" y2="1">
@@ -98,14 +135,14 @@ export function AdminOverviewCharts({ stats }: { stats: AdminStats }) {
                   fill="url(#enroll)"
                 />
               </AreaChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
         </ChartCard>
       </div>
 
       <ChartCard title="Attendance" description="Across the last 30 school days">
         <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
+          <ChartContainer>
             <PieChart>
               <Pie
                 data={attendance}
@@ -134,7 +171,7 @@ export function AdminOverviewCharts({ stats }: { stats: AdminStats }) {
                 formatter={(value) => <span className="text-xs">{value}</span>}
               />
             </PieChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </div>
         <p className="text-muted-foreground mt-2 text-center text-sm">
           Overall attendance rate:{" "}
@@ -144,7 +181,7 @@ export function AdminOverviewCharts({ stats }: { stats: AdminStats }) {
 
       <ChartCard title="Class sizes" description="Enrolled students per class">
         <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
+          <ChartContainer>
             <BarChart data={stats.classSizes} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="className" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
@@ -160,14 +197,14 @@ export function AdminOverviewCharts({ stats }: { stats: AdminStats }) {
               />
               <Bar dataKey="count" name="Students" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={42} />
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </div>
       </ChartCard>
 
       <div className="md:col-span-2">
         <ChartCard title="Grade distribution" description="Letter grades issued per class (all subjects, term 1–2)">
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer>
               <BarChart data={stats.gradeDistribution} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="className" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
@@ -190,7 +227,7 @@ export function AdminOverviewCharts({ stats }: { stats: AdminStats }) {
                   <Bar key={key} dataKey={key} stackId="grades" fill={color} maxBarSize={42} />
                 ))}
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
         </ChartCard>
       </div>

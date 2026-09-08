@@ -423,6 +423,17 @@ interface ApiError {
 }
 ```
 
+### 5 URL Namespacing
+
+API endpoints are namespaced by the role that may call them, and **every handler verifies the session user's role fresh on the server** (the URL prefix is organizational, never the enforcement):
+
+- `/api/admin/*` — admin only.
+- `/api/teacher/*` — teacher only; data is scoped to the logged-in teacher.
+- `/api/student/*` — student only; data is scoped to their own records.
+- `/api/auth/*` — Better Auth endpoints (public/session based).
+
+Endpoint tables below use these prefixes (e.g. `GET /api/users` is implemented as `GET /api/admin/users`; `GET /api/dashboard/teacher-stats` as `GET /api/teacher/dashboard`).
+
 ### 5.1 Auth (Better Auth) — free endpoints
 
 | Method & Path | Public? | Notes |
@@ -435,26 +446,26 @@ interface ApiError {
 
 ### 5.2 Users (admin only)
 
-**`GET /api/users`** — list users.
+**`GET /api/admin/users`** — list users.
 - Query: `q` (name/email LIKE), `role` (admin|teacher|student), `page=1`, `pageSize=20` (max 100).
 - Response: `Paginated<AuthUser>`.
 - Errors: `401`, `403`.
 
-**`GET /api/users/:id`**
+**`GET /api/admin/users/:id`**
 - Response: `AuthUser`.
 - Errors: `401`, `403`, `404`.
 
-**`POST /api/users`** — create an account with a role.
+**`POST /api/admin/users`** — create an account with a role.
 - Body: `{ name: string; email: string; password: string (min 8); role: UserRole }`.
 - Response: `201 AuthUser`.
 - Errors: `401`, `403`, `409` (duplicate email), `422`.
 
-**`PATCH /api/users/:id`**
+**`PATCH /api/admin/users/:id`**
 - Body: `{ name?: string; role?: UserRole; banned?: boolean; banReason?: string | null; banExpiresAt?: string | null }`.
 - Response: `AuthUser`.
 - Errors: `401`, `403`, `404`, `409`.
 
-**`DELETE /api/users/:id`**
+**`DELETE /api/admin/users/:id`**
 - Response: `204`. Cascades to profile/enrollments/grades/attendance.
 - Errors: `401`, `403`, `404`.
 
@@ -647,7 +658,7 @@ interface ApiError {
 
 ### 5.10 Dashboard stats
 
-**`GET /api/dashboard/admin-stats`** — (admin).
+**`GET /api/admin/dashboard`** — (admin). Admin overview stats.
 - Response:
   ```ts
   {
@@ -659,7 +670,7 @@ interface ApiError {
   }
   ```
 
-**`GET /api/dashboard/teacher-stats`** — (teacher).
+**`GET /api/teacher/dashboard`** — (teacher). Teacher overview stats.
 - Response:
   ```ts
   {
@@ -670,7 +681,7 @@ interface ApiError {
   }
   ```
 
-**`GET /api/dashboard/student-stats`** — (student, own data).
+**`GET /api/student/dashboard`** — (student, own data). Student overview stats.
 - Response:
   ```ts
   {
@@ -729,9 +740,9 @@ Include 1–2 students with no grades/attendance to exercise empty states.
 
 | Screen | Data endpoint(s) | Roles |
 |---|---|---|
-| Dashboard (admin) | `GET /api/dashboard/admin-stats` | admin |
-| Dashboard (teacher) | `GET /api/dashboard/teacher-stats` | teacher |
-| Dashboard (student) | `GET /api/dashboard/student-stats` | student |
+| Dashboard (admin) | `GET /api/admin/dashboard` | admin |
+| Dashboard (teacher) | `GET /api/teacher/dashboard` | teacher |
+| Dashboard (student) | `GET /api/student/dashboard` | student |
 | Students list / detail | `GET /api/students`·`/api/students/:id` | admin, teacher |
 | Student view (self) | `GET /api/students/:id/grades`, `…/attendance` | student (own) |
 | Teachers list / detail | `GET /api/teachers`·`/api/teachers/:id` | admin, teacher |

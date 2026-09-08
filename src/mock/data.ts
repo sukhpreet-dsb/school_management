@@ -312,6 +312,33 @@ export function getTeacher(id: string): Teacher | undefined {
   return getTeachers().find((t) => t.id === id);
 }
 
+const TEACHER_EMAIL_RE = /^teacher([1-8])@school\.edu$/i;
+
+/**
+ * Resolves a real auth user (by email) to a mock teacher profile.
+ * - Seed accounts (`teacherN@school.edu`) map to their matching profile.
+ * - Any other email deterministically maps to one of the 8 mock teachers so
+ *   admin-created teacher accounts see a stable, realistic dashboard.
+ * Replaced by real DB-backed data in the backend phase.
+ */
+export function getTeacherForUser(input: {
+  email?: string | null;
+}): Teacher | undefined {
+  const email = input?.email?.toLowerCase() ?? '';
+
+  const match = TEACHER_EMAIL_RE.exec(email);
+  if (match) {
+    return getTeacher(`tch-${pad(Number(match[1]), 2)}`);
+  }
+
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) {
+    hash = (hash * 31 + email.charCodeAt(i)) >>> 0;
+  }
+  const index = hash % teachers.length;
+  return getTeacher(teachers[index].id);
+}
+
 export function getSubjects(): Subject[] {
   return subjects;
 }

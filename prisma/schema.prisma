@@ -8,22 +8,62 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  name          String
-  email         String
-  emailVerified Boolean   @default(false)
-  image         String?
-  role          String    @default("student")
-  banned        Boolean   @default(false)
-  banReason     String?
-  banExpiresAt  DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
+  id             String    @id @default(uuid())
+  name           String
+  email          String
+  emailVerified  Boolean   @default(false)
+  image          String?
+  role           String    @default("student")
+  banned         Boolean   @default(false)
+  banReason      String?
+  banExpiresAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  sessions       Session[]
+  accounts       Account[]
+  teacherProfile Teacher?
+  studentProfile Student?
 
   @@unique([email])
   @@map("user")
+}
+
+model Teacher {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  empCode     String    @unique
+  phone       String?
+  hireDate    DateTime?
+  designation String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("teacher")
+}
+
+model Student {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admissionNo   String    @unique
+  dob           DateTime?
+  gender        Gender?
+  address       String?
+  guardianName  String?
+  guardianPhone String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("student")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+
+  @@map("gender")
 }
 
 model Session {

@@ -1,17 +1,12 @@
-import { getSession } from '@/server/auth';
-import { LogoutButton } from '@/components/dashboard/logout-button';
+import { requireRole } from '@/server/auth';
+import { TeacherDashboard } from '@/components/teacher/teacher-dashboard';
 
 export default async function TeacherPage() {
-  const session = await getSession();
-  const user = session?.user;
+  const session = await requireRole('teacher');
 
   return (
-    <div className='mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-6 p-6 text-center'>
-      <h1 className='text-3xl font-bold tracking-tight'>Teacher area</h1>
-      <p className='text-muted-foreground'>
-        Signed in as {user?.name} ({user?.role})
-      </p>
-      <LogoutButton />
-    </div>
+    <TeacherDashboard
+      user={{ name: session.user.name, email: session.user.email }}
+    />
   );
 }

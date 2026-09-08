@@ -15,6 +15,13 @@ export interface AuthUser {
   emailVerified: boolean;
   banned: boolean;
   createdAt: string;
+  profile?: {
+    empCode?: string;
+    phone?: string | null;
+    hireDate?: string | null;
+    designation?: string | null;
+    admissionNo?: string;
+  };
 }
 
 export interface StudentSummary {
@@ -145,8 +152,14 @@ export interface AdminStats {
   attendanceBreakdown: { present: number; late: number; absent: number; excused: number };
 }
 
+export interface TeacherClassSummary {
+  id: string;
+  name: string;
+  studentCount: number;
+}
+
 export interface TeacherStats {
-  myClasses: Array<{ id: string; name: string; studentCount: number }>;
+  myClasses: TeacherClassSummary[];
   subjectsTaught: Subject[];
   gradeDistributionForMyClasses: GradeDistribution[];
   attendanceRateByClass: Array<{ className: string; rate: number }>;
