@@ -224,25 +224,6 @@ export function SignupForm({
           Sign in
         </Link>
       </p>
-
-      {/* Terms */}
-      <p className='text-muted-foreground px-8 text-center text-xs'>
-        By clicking continue, you agree to our{' '}
-        <Link
-          href='#'
-          className='hover:text-primary underline underline-offset-4'
-        >
-          Terms of Service
-        </Link>{' '}
-        and{' '}
-        <Link
-          href='#'
-          className='hover:text-primary underline underline-offset-4'
-        >
-          Privacy Policy
-        </Link>
-        .
-      </p>
     </div>
   );
 }

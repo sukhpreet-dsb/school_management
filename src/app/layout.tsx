@@ -9,9 +9,9 @@ import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
-  title: 'SaaS Starter Template',
+  title: 'School Management',
   description:
-    'A starter template for Next.js projects using Better Auth and Prisma.'
+    'A school management system built with Next.js, TypeScript, Tailwind CSS, better-auth, and Prisma.',
 };
 
 export default function RootLayout({

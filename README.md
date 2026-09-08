@@ -1,159 +1,155 @@
-# Next.js Better Auth Prisma Template
+# School OS — School Management System
 
-This is a robust and modern template for Next.js applications, pre-configured with advanced authentication, database, and ready-to-use UI components. Designed to accelerate the development of secure and scalable web applications.
+A role-based school management platform built on Next.js 16, Better Auth, Prisma, and Tailwind CSS 4. Admins manage users, teachers, students, classes, and grades; teachers handle their classes and attendance; students view their own profile, grades, and attendance.
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/nextjs-better-auth-prisma-template?referralCode=HKQvZr&utm_medium=integration&utm_source=template&utm_campaign=generic)
+- **[Backend contract & API spec](SCHOOL_MANAGEMENT_SPEC.md)** — roles matrix, Prisma schema, REST API shapes, business rules, acceptance checklist.
+- **[Learning roadmap](LEARNING_ROADMAP.md)** — two-phase, module-based build plan (UI-first, then backend).
 
-## ✨ Main Features
+## ✨ Features
 
-- **Complete Authentication**: Robust authentication system with [Better Auth](https://better-auth.com/)
-  - Email & Password
-  - Social Login (Google)
-  - Email Verification
-  - Password Recovery
-  - Session Management
-- **Roles and Permissions**: Role system (Admin, User) integrated with route protection
-- **Database**: PostgreSQL with Prisma ORM and custom output in `src/generated/prisma`
-- **Modern UI**: Styled components with Tailwind CSS 4 and Shadcn UI (Base UI style, not Radix)
-- **Transactional Emails**: Email templates with React Email and sending via Resend
-- **Dashboards**: Pre-built layouts for admin and user panels
-- **Type-Safe**: Safe development with TypeScript throughout the project
+- **Role-based access** for **Admin / Teacher / Student** — server-side guards (`requireRole`) on every route; wrong role gets a 403.
+- **Authentication** with [Better Auth](https://better-auth.com/):
+  - Email & password signup / signin with httpOnly cookie sessions
+  - Forgot / reset password via transactional email (Resend)
+  - First registered user bootstraps as **admin**; public signups become **students**; admins provision teachers
+- **Role-aware UI** — each role lands on its own dashboard (`/admin`, `/teacher`, `/student`).
+- **Admin overview** — stat cards + charts (enrollment, attendance, class size, grade distribution) using Recharts.
+- **Mock-driven frontend** — a realistic seeded dataset (8 subjects, 6 classes, 8 teachers, 50 students, grades, attendance) powers the UI until the real backend lands.
+- **Theme-aware UI** — light/dark mode, shadcn/ui components built on [Base UI](https://base-ui.com/).
+- **Reusable data table** — search, sort, pagination via TanStack Table.
 
 ## 🚀 Technologies
 
-- **[Next.js 16.2](https://nextjs.org/)**: App Router, Server Components and Server Actions
-- **[React 19.2](https://react.dev/)**: Latest React features
-- **[Better Auth 1.6](https://better-auth.com/)**: Modern and secure authentication
-- **[Prisma 7.8](https://www.prisma.io/)**: ORM for interacting with PostgreSQL, using the `@prisma/adapter-pg` driver adapter
-- **[Tailwind CSS 4.3](https://tailwindcss.com/)**: Fast and flexible styling
-- **[Shadcn UI](https://ui.shadcn.com/)** on **[Base UI](https://base-ui.com/)**: Accessible and customizable UI components
-- **[Bun](https://bun.sh/)**: Fast JavaScript runtime (recommended)
+- **[Next.js 16](https://nextjs.org/)** — App Router, Server Components, Server Actions, `authInterrupts`
+- **[React 19](https://react.dev/)**
+- **[Better Auth 1.6](https://better-auth.com/)** — sessions, admin plugin, password reset
+- **[Prisma 7](https://www.prisma.io/)** — with the `@prisma/adapter-pg` driver adapter
+- **[Tailwind CSS 4](https://tailwindcss.com/)**
+- **[shadcn/ui](https://ui.shadcn.com/)** on **[Base UI](https://base-ui.com/)**
+- **[TanStack Table](https://tanstack.com/table)** — data tables
+- **[Recharts](https://recharts.org/)** — dashboards & charts
+- **[Resend](https://resend.com/)** — transactional email (password reset)
+- **[Bun](https://bun.sh/)** — JavaScript runtime & package manager (recommended)
 
-## 🛠️ Installation and Setup
+## 🛠️ Getting Started
 
-Follow these steps to set up the project in your local environment:
-
-### 1. Clone the repository
-
-```bash
-git clone <repository-url>
-cd nextjs-better-auth-prisma-template
-```
-
-### 2. Install dependencies
-
-We recommend using **Bun** for a faster experience:
+### 1. Install dependencies
 
 ```bash
 bun install
 ```
 
-### 3. Configure Environment Variables
+### 2. Configure environment variables
 
-Create a `.env` file in the project root and configure the following variables:
+Create a `.env` file at the project root:
 
 ```env
 # Database (PostgreSQL)
-DATABASE_URL="postgresql://user:password@localhost:5432/mydb?schema=public"
+DATABASE_URL="postgresql://user:password@localhost:5432/school_management?schema=public"
 
 # Better Auth
 BETTER_AUTH_SECRET="your_super_secure_secret" # Generate with: openssl rand -base64 32
 BETTER_AUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_BASE_URL="http://localhost:3000"
 
-# OAuth Providers (Google)
-GOOGLE_CLIENT_ID="your_google_client_id"
-GOOGLE_CLIENT_SECRET="your_google_client_secret"
-
-# Email (Resend)
+# Email (Resend) — sender domain must be verified at resend.com/domains
 RESEND_API_KEY="re_123456789"
-EMAIL_SENDER_NAME="Your App"
-EMAIL_SENDER_ADDRESS="noreply@yourapp.com"
+EMAIL_SENDER_NAME="School Management System"
+EMAIL_SENDER_ADDRESS="noreply@yourdomain.com"
 ```
 
-### 4. Configure the Database
-
-Run Prisma migrations to create the tables:
+### 3. Set up the database
 
 ```bash
-bunx prisma migrate dev
+bunx prisma migrate dev   # creates tables + generates the Prisma client
+bun run db:seed           # optional: creates demo accounts
 ```
 
-This will also generate the Prisma client in `src/generated/prisma` automatically.
-
-### 5. Start the Development Server
+### 4. Start the development server
 
 ```bash
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000).
+
+## 👤 Demo Accounts
+
+After running `bun run db:seed`:
+
+| Role    | Email                | Password       |
+| ------- | -------------------- | -------------- |
+| Admin   | `admin@school.edu`   | `Password123!` |
+| Teacher | `teacher@school.edu` | `Password123!` |
+| Student | `student@school.edu` | `Password123!` |
+
+> **Role bootstrap:** the first user to sign up publicly becomes `admin`; every later public signup is a `student`. Admin users promote accounts to `teacher` (users management).
+
+## 🔐 Auth Flow
+
+1. Signup/login uses Better Auth **httpOnly cookie sessions**.
+2. The user's `role` is stored on the DB row and **re-read fresh on every request** — authorization never trusts a stale client value.
+3. Route groups are guarded per role: `/admin` → `requireRole('admin')`, `/teacher` → `requireRole('teacher')`, `/student` → `requireRole('student')`, `/dashboard` redirects to the role's home.
+4. Forgot password → `requestPasswordReset` → Resend email → `/reset-password?token=…` → new password (other sessions revoked).
 
 ## 📂 Project Structure
 
 ```
 ├── prisma/
-│   ├── schema.prisma       # Database schema
-│   └── migrations/         # Migration history
-├── public/                 # Static files (favicons, tech-stack logo SVGs)
+│   ├── schema.prisma       # Auth models (User, Session, Account, Verification)
+│   └── seed.ts             # Demo accounts (admin/teacher/student)
 ├── src/
-│   ├── app/                # Application routes (App Router)
-│   │   ├── (auth)/         # Authentication routes
-│   │   │   ├── login/
-│   │   │   ├── signup/
-│   │   │   ├── forgot-password/
-│   │   │   └── reset-password/
-│   │   ├── (public)/       # Public landing page
-│   │   ├── (protected)/    # Routes requiring a session
-│   │   │   ├── dashboard/  # User panel
-│   │   │   └── admin/      # Admin panel (requires role === "admin")
-│   │   └── api/            # API Routes (Better Auth handler, health check)
-│   ├── components/         # React components
-│   │   ├── admin/          # Admin panel components (+ layout/ subfolder)
-│   │   ├── dashboard/      # User panel components (+ layout/ subfolder)
-│   │   ├── emails/         # Email templates (React Email)
-│   │   ├── landing/        # Public landing page components
-│   │   ├── shared/         # Shared components
-│   │   └── ui/             # Base components (Shadcn UI on Base UI)
-│   ├── generated/          # Generated code
-│   │   └── prisma/         # Generated Prisma client
-│   ├── hooks/              # Custom React Hooks
-│   ├── lib/                # Utilities and configuration
-│   │   ├── auth.ts         # Better Auth configuration (server-only)
-│   │   ├── auth-client.ts  # Better Auth client (Client Components)
-│   │   ├── prisma.ts       # Prisma client singleton
-│   │   └── utils.ts        # Helper functions
-│   ├── server/             # Server Actions
-│   └── types/              # TypeScript type definitions
+│   ├── app/
+│   │   ├── (auth)/         # login, signup, forgot-password, reset-password
+│   │   ├── (public)/       # Landing page (redirects by auth state)
+│   │   ├── (protected)/    # Session + role-guarded routes
+│   │   │   ├── admin/      # Admin dashboard (requireRole('admin'))
+│   │   │   ├── teacher/    # Teacher dashboard (requireRole('teacher'))
+│   │   │   ├── student/    # Student dashboard (requireRole('student'))
+│   │   │   └── dashboard/  # Session-required; redirects to role home
+│   │   └── api/            # Better Auth handler, health check
+│   ├── components/
+│   │   ├── layout/         # app-shell, auth-shell, sidebar, header, stat-card…
+│   │   ├── data-table/     # TanStack Table wrapper (search/sort/pagination)
+│   │   ├── dashboard/      # admin-overview charts
+│   │   ├── shared/         # shared components
+│   │   └── ui/             # shadcn/ui components on Base UI
+│   ├── generated/prisma/   # Generated Prisma client
+│   ├── lib/                # auth, auth-client, email, roles, prisma, utils
+│   ├── mock/               # data.ts (dataset + selectors), nav.ts (role nav)
+│   ├── server/             # auth.ts — getSession / requireSession / requireRole
+│   ├── proxy.ts            # Middleware: redirects unauthenticated users to /login
+│   └── types/              # domain.ts — DTO contracts mirroring the spec
 ```
 
 ## 📜 Available Scripts
 
-- `bun dev`: Starts the development server with Bun runtime
-- `bun build`: Generates the Prisma client and builds the application for production
-- `bun start`: Applies pending migrations and starts the production server
-- `bun lint`: Runs the linter to check the code
-- `bunx prisma studio`: Opens Prisma Studio to visually manage the database
-- `bunx prisma migrate dev`: Creates and applies database migrations
-- `bunx prisma generate`: Regenerates the Prisma client after schema changes without creating a migration
+- `bun dev` — start the development server
+- `bun build` — generate the Prisma client and build for production
+- `bun start` — apply pending migrations and start the production server
+- `bun run lint` — run ESLint
+- `bun run db:seed` — create the demo accounts
+- `bunx prisma migrate dev` — create and apply a migration
+- `bunx prisma generate` — regenerate the Prisma client
+- `bunx prisma studio` — inspect/edit data via Prisma Studio
+- `bunx tsc --noEmit` — type-check
 
 ## 🗄️ Database Models
 
-The project includes the following models:
+The shipped schema currently holds the **auth** models:
 
-- **User**: User information (id, name, email, role, banned, etc.)
-- **Session**: Session management with IP and userAgent information
-- **Account**: Linking with OAuth providers and credentials
-- **Verification**: Tokens for email verification and password recovery
+- **User** — id, name, email, `role` (admin/teacher/student), `banned`
+- **Session** — session tokens with IP/userAgent
+- **Account** — credential passwords + OAuth provider links
+- **Verification** — email-verification and password-reset tokens
+
+The full **domain schema** (students, teachers, subjects, classes, enrollments, grades, attendance) is specified in [SCHOOL_MANAGEMENT_SPEC.md](SCHOOL_MANAGEMENT_SPEC.md) and lands during the backend phase.
 
 ## 📚 More Information
 
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Better Auth Documentation](https://better-auth.com/docs)
 - [Prisma Documentation](https://www.prisma.io/docs)
-- [Shadcn UI Documentation](https://ui.shadcn.com/docs)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [shadcn/ui Documentation](https://ui.shadcn.com/docs)
 - [Base UI Documentation](https://base-ui.com/react/overview/quick-start)
-
-## 📄 License
-
-This project is under the MIT license.
