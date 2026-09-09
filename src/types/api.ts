@@ -23,3 +23,26 @@ export interface CreateUserBody {
   phone?: string;
   hireDate?: string;
 }
+
+export interface CreateStudentBody {
+  name: string;
+  email: string;
+  password: string;
+  schoolClassId: string;
+  admissionNo?: string;
+  dob?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  address?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+}
+
+export interface UpdateStudentBody {
+  name?: string;
+  dob?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  address?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  schoolClassId?: string;
+}

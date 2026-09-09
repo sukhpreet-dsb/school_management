@@ -148,6 +148,10 @@ export function DataTable<TData, TValue>({
   const from = totalCount === 0 ? 0 : pageIndex * perPage + 1
   const to = Math.min((pageIndex + 1) * perPage, totalCount)
 
+  const pageSizeOptions = React.useMemo(() => {
+    return Array.from(new Set([10, 25, 50, pageSize])).sort((a, b) => a - b)
+  }, [pageSize])
+
   return (
     <div data-slot="data-table" className="flex flex-col gap-3">
       {(searchKey || toolbar) && (
@@ -243,7 +247,7 @@ export function DataTable<TData, TValue>({
             className="h-7 w-20 text-xs"
             aria-label="Rows per page"
           >
-            {[pageSize, 25, 50].map((size) => (
+            {pageSizeOptions.map((size) => (
               <option key={size} value={String(size)}>
                 {size} / page
               </option>

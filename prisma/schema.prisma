@@ -55,6 +55,7 @@ model Student {
   guardianPhone String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  enrollments   Enrollment[]
 
   @@map("student")
 }
@@ -67,6 +68,15 @@ enum Gender {
   @@map("gender")
 }
 
+enum EnrollmentStatus {
+  ACTIVE
+  TRANSFERRED
+  GRADUATED
+  DROPPED
+
+  @@map("enrollment_status")
+}
+
 model Class {
   id           String         @id @default(uuid())
   grade        Int
@@ -76,9 +86,27 @@ model Class {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   assignments  TeacherClass[]
+  enrollments  Enrollment[]
 
   @@unique([grade, section, academicYear])
   @@map("class")
+}
+
+model Enrollment {
+  id            String           @id @default(uuid())
+  status        EnrollmentStatus @default(ACTIVE)
+  enrolledAt    DateTime         @default(now())
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  studentId     String
+  schoolClassId String
+  academicYear  String           @default("2026-2027")
+  student       Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  schoolClass   Class            @relation(fields: [schoolClassId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, schoolClassId, academicYear])
+  @@index([schoolClassId, academicYear])
+  @@map("enrollment")
 }
 
 model TeacherClass {

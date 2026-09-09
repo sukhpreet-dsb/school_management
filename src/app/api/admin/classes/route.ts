@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import { apiError, handleApiRoute, requireApiRole } from '@/server/api-auth';
-import { getClassCatalog, toClassCatalogItem } from '@/server/teacher';
+import { getClassCatalog, getClassStudentCounts, toClassCatalogItem } from '@/server/teacher';
 import type { ClassCatalogItem, Paginated } from '@/types/domain';
 
 const listQuerySchema = z.object({
@@ -52,9 +52,11 @@ export async function GET(request: NextRequest) {
       prisma.class.count({ where })
     ]);
 
+    const counts = await getClassStudentCounts();
+
     return {
       data: {
-        items: rows.map(toClassCatalogItem),
+        items: rows.map((row) => toClassCatalogItem(row, counts.get(row.id) ?? 0)),
         total,
         page: query.page,
         pageSize: query.pageSize,

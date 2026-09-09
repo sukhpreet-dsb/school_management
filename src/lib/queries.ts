@@ -2,7 +2,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetcher } from '@/lib/api';
-import type { CreateUserBody } from '@/types/api';
+import type { CreateStudentBody, CreateUserBody, UpdateStudentBody } from '@/types/api';
 import type {
   AuthUser,
   ClassCatalogItem,
@@ -75,6 +75,23 @@ export function useClassEnrollments(
   });
 }
 
+export function useTeacherStudents(
+  opts: { page?: number; pageSize?: number; q?: string; classId?: string } = {}
+) {
+  const page = opts.page ?? 1;
+  const pageSize = opts.pageSize ?? 10;
+  const q = opts.q?.trim() ?? '';
+  const classId = opts.classId?.trim() ?? '';
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (q) params.set('q', q);
+  if (classId) params.set('classId', classId);
+  return useQuery({
+    queryKey: ['teacher', 'students', 'list', page, pageSize, q, classId],
+    queryFn: () => fetcher<Paginated<Student>>(`/api/teacher/students?${params.toString()}`),
+    placeholderData: keepPreviousData
+  });
+}
+
 export function useClasses(opts: { page?: number; pageSize?: number; q?: string } = {}) {
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? 10;
@@ -141,5 +158,53 @@ export function useAssignTeacherClasses() {
       queryClient.invalidateQueries({ queryKey: ['teacher', 'dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['teacher', 'classes'] });
     }
+  });
+}
+
+export function useStudents(opts: { page?: number; pageSize?: number; q?: string } = {}) {
+  const page = opts.page ?? 1;
+  const pageSize = opts.pageSize ?? 10;
+  const q = opts.q?.trim() ?? '';
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (q) params.set('q', q);
+  return useQuery({
+    queryKey: ['admin', 'students', 'list', page, pageSize, q],
+    queryFn: () => fetcher<Paginated<Student>>(`/api/admin/students?${params.toString()}`),
+    placeholderData: keepPreviousData
+  });
+}
+
+function invalidateStudentData(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['admin', 'students'] });
+  queryClient.invalidateQueries({ queryKey: ['admin', 'classes'] });
+  queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+  queryClient.invalidateQueries({ queryKey: ['teacher', 'classes'] });
+  queryClient.invalidateQueries({ queryKey: ['teacher', 'dashboard'] });
+}
+
+export function useCreateStudent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateStudentBody) =>
+      fetcher<Student>('/api/admin/students', { method: 'POST', body }),
+    onSuccess: () => invalidateStudentData(queryClient)
+  });
+}
+
+export function useUpdateStudent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, ...body }: UpdateStudentBody & { studentId: string }) =>
+      fetcher<Student>(`/api/admin/students/${studentId}`, { method: 'PATCH', body }),
+    onSuccess: () => invalidateStudentData(queryClient)
+  });
+}
+
+export function useDeleteStudent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (studentId: string) =>
+      fetcher<{ id: string }>(`/api/admin/students/${studentId}`, { method: 'DELETE' }),
+    onSuccess: () => invalidateStudentData(queryClient)
   });
 }

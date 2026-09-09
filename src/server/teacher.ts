@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import { getClassRoster, getClassSubjects, getGrades, getAttendance } from '@/mock/data';
+import { getClassRoster, getClassSubjects, getGrades, getAttendance, ACADEMIC_YEAR } from '@/mock/data';
 import type { ClassCatalogItem, Subject, TeacherStats } from '@/types/domain';
 
 export interface AssignedClassInfo {
@@ -46,6 +46,8 @@ export async function getTeacherAssignment(input: {
     include: { class: true }
   });
 
+  const counts = await getClassStudentCounts();
+
   const assignedClasses: AssignedClassInfo[] = assignments.map((a) => {
     const mockKey = mockKeyFor(a.class.grade, a.class.section);
     const known = Boolean(getClassSubjects(mockKey).length || getClassRoster(mockKey).length);
@@ -54,7 +56,7 @@ export async function getTeacherAssignment(input: {
       mockKey: known ? mockKey : null,
       name: `Class ${a.class.grade}${a.class.section ? ` ${a.class.section}` : ''}`,
       room: a.class.room,
-      studentCount: known ? getClassRoster(mockKey).length : 0
+      studentCount: counts.get(a.class.id) ?? 0
     };
   });
 
@@ -143,15 +145,27 @@ export async function setTeacherClassAssignments(opts: {
   });
 }
 
-export function toClassCatalogItem(c: {
-  id: string;
-  grade: number;
-  section: string;
-  room: string | null;
-  academicYear: string;
-}): ClassCatalogItem {
-  const mockKey = mockKeyFor(c.grade, c.section);
-  const known = Boolean(getClassSubjects(mockKey).length || getClassRoster(mockKey).length);
+export async function getClassStudentCounts(
+  academicYear: string = ACADEMIC_YEAR
+): Promise<Map<string, number>> {
+  const rows = await prisma.enrollment.groupBy({
+    by: ['schoolClassId'],
+    where: { status: 'ACTIVE', academicYear },
+    _count: { _all: true }
+  });
+  return new Map(rows.map((r) => [r.schoolClassId, r._count._all]));
+}
+
+export function toClassCatalogItem(
+  c: {
+    id: string;
+    grade: number;
+    section: string;
+    room: string | null;
+    academicYear: string;
+  },
+  studentCount: number
+): ClassCatalogItem {
   return {
     id: c.id,
     grade: c.grade,
@@ -159,7 +173,7 @@ export function toClassCatalogItem(c: {
     name: `Class ${c.grade}${c.section ? ` ${c.section}` : ''}`,
     room: c.room,
     academicYear: c.academicYear,
-    studentCount: known ? getClassRoster(mockKey).length : 0
+    studentCount
   };
 }
 
@@ -167,7 +181,8 @@ export async function getClassCatalog(): Promise<ClassCatalogItem[]> {
   const dbClasses = await prisma.class.findMany({
     orderBy: [{ grade: 'asc' }, { section: 'asc' }]
   });
-  return dbClasses.map(toClassCatalogItem);
+  const counts = await getClassStudentCounts();
+  return dbClasses.map((c) => toClassCatalogItem(c, counts.get(c.id) ?? 0));
 }
 
 export async function findDbClassIds(classIds: string[]): Promise<string[]> {

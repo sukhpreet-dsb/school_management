@@ -22,7 +22,7 @@ export interface NavItem {
 export const NAV: Record<UserRole, NavItem[]> = {
   admin: [
     { title: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-    // { title: 'Students', href: '/admin/students', icon: GraduationCap },
+    { title: 'Students', href: '/admin/students', icon: GraduationCap },
     { title: 'Teachers', href: '/admin/teachers', icon: Users },
     { title: 'Classes', href: '/admin/classes', icon: School },
     // { title: 'Subjects', href: '/admin/subjects', icon: BookOpen },
