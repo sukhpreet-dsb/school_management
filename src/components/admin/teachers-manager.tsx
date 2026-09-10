@@ -28,9 +28,11 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useCreateTeacher, useTeachers } from '@/lib/queries';
+import { useCreateTeacher, useSubjectCatalog, useTeachers } from '@/lib/queries';
 import { useSafePage } from '@/lib/use-safe-page';
 import { AssignClassesSheet } from '@/components/admin/assign-classes-sheet';
+import { AssignSubjectsSheet } from '@/components/admin/assign-subjects-sheet';
+import { cn } from '@/lib/utils';
 import type { AuthUser } from '@/types/domain';
 
 const columns: ColumnDef<AuthUser>[] = [
@@ -51,6 +53,23 @@ const columns: ColumnDef<AuthUser>[] = [
     accessorKey: 'phone',
     header: 'Phone',
     cell: ({ row }) => row.original.profile?.phone ?? '—'
+  },
+  {
+    accessorKey: 'subjects',
+    header: 'Subjects',
+    cell: ({ row }) => {
+      const subs = row.original.subjects ?? row.original.profile?.subjects ?? [];
+      if (subs.length === 0) return <span className='text-muted-foreground text-xs'>None</span>;
+      return (
+        <div className='flex max-w-48 flex-wrap gap-1'>
+          {subs.map((s) => (
+            <Badge key={s.id} variant='outline' className='text-xs'>
+              {s.code}
+            </Badge>
+          ))}
+        </div>
+      );
+    }
   },
   {
     accessorKey: 'classCount',
@@ -83,24 +102,39 @@ const columns: ColumnDef<AuthUser>[] = [
 ];
 
 function AssignAction({ user }: { user: AuthUser }) {
-  const [open, setOpen] = useState(false);
+  const [classesOpen, setClassesOpen] = useState(false);
+  const [subjectsOpen, setSubjectsOpen] = useState(false);
   return (
-    <>
+    <div className='flex items-center gap-1.5'>
       <Button
         variant='outline'
         size='sm'
-        onClick={() => setOpen(true)}
+        onClick={() => setSubjectsOpen(true)}
         className='whitespace-nowrap'
       >
-        Assign classes
+        Subjects
       </Button>
-      <AssignClassesSheet
-        open={open}
-        onOpenChange={setOpen}
+      <Button
+        variant='outline'
+        size='sm'
+        onClick={() => setClassesOpen(true)}
+        className='whitespace-nowrap'
+      >
+        Classes
+      </Button>
+      <AssignSubjectsSheet
+        open={subjectsOpen}
+        onOpenChange={setSubjectsOpen}
         teacherId={user.id}
         teacherName={user.name}
       />
-    </>
+      <AssignClassesSheet
+        open={classesOpen}
+        onOpenChange={setClassesOpen}
+        teacherId={user.id}
+        teacherName={user.name}
+      />
+    </div>
   );
 }
 
@@ -127,8 +161,10 @@ export function TeachersManager() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
 
   const teachers = useTeachers({ page, pageSize, q: search || undefined });
+  const subjectsCatalog = useSubjectCatalog();
   const createTeacher = useCreateTeacher();
 
   const safePage = useSafePage(page, teachers.data?.totalPages, setPage);
@@ -145,6 +181,21 @@ export function TeachersManager() {
     }
   });
 
+  function toggleSubject(subjectId: string) {
+    setSelectedSubjectIds((prev) =>
+      prev.includes(subjectId) ? prev.filter((id) => id !== subjectId) : [...prev, subjectId]
+    );
+  }
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      setError(null);
+      setSelectedSubjectIds([]);
+      form.reset();
+    }
+  }
+
   async function onSubmit(values: CreateTeacherValues) {
     setError(null);
 
@@ -156,11 +207,13 @@ export function TeachersManager() {
         role: 'teacher',
         empCode: values.empCode || undefined,
         phone: values.phone || undefined,
-        hireDate: values.hireDate || undefined
+        hireDate: values.hireDate || undefined,
+        subjectIds: selectedSubjectIds.length > 0 ? selectedSubjectIds : undefined
       });
 
       toast.success(`Teacher created. Temp password: ${values.password}`);
       form.reset();
+      setSelectedSubjectIds([]);
       setOpen(false);
       setPage(1);
     } catch (err) {
@@ -210,7 +263,7 @@ export function TeachersManager() {
           searchPlaceholder='Search by email or name…'
           emptyMessage='No teachers yet. Add one to get started.'
           toolbar={
-            <Button size='sm' onClick={() => setOpen(true)}>
+            <Button size='sm' onClick={() => handleOpenChange(true)}>
               <PlusIcon />
               Add teacher
             </Button>
@@ -218,12 +271,12 @@ export function TeachersManager() {
         />
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <form id='add-teacher-form' onSubmit={form.handleSubmit(onSubmit)}>
           <DialogHeader>
             <DialogTitle>Add teacher</DialogTitle>
             <DialogDescription>
-              Creates a teacher account. Share the temporary password with the
+              Creates a teacher account and assigns subjects. Share the temporary password with the
               teacher after saving.
             </DialogDescription>
           </DialogHeader>
@@ -348,6 +401,41 @@ export function TeachersManager() {
                   </Field>
                 )}
               />
+
+              <Field>
+                <FieldLabel>Subjects taught (optional)</FieldLabel>
+                {subjectsCatalog.isLoading ? (
+                  <div className='py-2'>
+                    <Spinner />
+                  </div>
+                ) : (subjectsCatalog.data?.items ?? []).length === 0 ? (
+                  <p className='text-muted-foreground text-xs'>
+                    No subjects in catalog. You can add subjects from the Subjects page.
+                  </p>
+                ) : (
+                  <div className='flex flex-wrap gap-1.5 pt-1'>
+                    {(subjectsCatalog.data?.items ?? []).map((s) => {
+                      const selected = selectedSubjectIds.includes(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type='button'
+                          onClick={() => toggleSubject(s.id)}
+                          className={cn(
+                            'flex cursor-pointer items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
+                            selected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted'
+                          )}
+                        >
+                          <span>{s.name}</span>
+                          <span className='text-[10px] opacity-75'>({s.code})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </Field>
             </FieldGroup>
           </div>
 
@@ -355,7 +443,7 @@ export function TeachersManager() {
             <Button
               type='button'
               variant='outline'
-              onClick={() => setOpen(false)}
+              onClick={() => handleOpenChange(false)}
               disabled={createTeacher.isPending}
             >
               Cancel

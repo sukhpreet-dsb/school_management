@@ -3,31 +3,38 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { GraduationCap, PanelLeftClose, PanelLeft } from "lucide-react"
+import { GraduationCap, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { NAV, type NavItem } from "@/mock/nav"
 import type { UserRole } from "@/types/domain"
 import { Sheet } from "@/components/ui/sheet"
 
-function Brand({ collapsed }: { collapsed?: boolean }) {
+function SidebarHeader({ collapsed }: { collapsed?: boolean }) {
   return (
-    <Link
-      href="#"
+    <div
       className={cn(
-        "flex h-12 items-center gap-2.5 px-3",
-        collapsed && "justify-center px-0"
+        "border-sidebar-border/50 flex h-16 shrink-0 items-center border-b px-3 transition-all",
+        collapsed ? "justify-center px-0" : "px-4"
       )}
     >
-      <div className="bg-sidebar-primary text-sidebar-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-xl">
-        <GraduationCap className="size-5" />
-      </div>
-      {!collapsed && (
-        <span className="text-sidebar-foreground text-sm font-semibold tracking-tight">
-          School OS
-        </span>
-      )}
-    </Link>
+      <Link
+        href="#"
+        className={cn(
+          "flex items-center gap-2.5",
+          collapsed && "justify-center"
+        )}
+      >
+        <div className="bg-sidebar-primary text-sidebar-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-xl shadow-sm">
+          <GraduationCap className="size-5" />
+        </div>
+        {!collapsed && (
+          <span className="text-sidebar-foreground text-sm font-semibold tracking-tight">
+            School OS
+          </span>
+        )}
+      </Link>
+    </div>
   )
 }
 
@@ -49,8 +56,8 @@ function NavLink({
       href={item.href}
       onClick={onClick}
       className={cn(
-        "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-        active && "bg-sidebar-accent text-sidebar-accent-foreground",
+        "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+        active && "bg-sidebar-accent text-sidebar-accent-foreground shadow-xs font-semibold",
         collapsed && "justify-center px-2"
       )}
       title={collapsed ? item.title : undefined}
@@ -82,12 +89,10 @@ export function SidebarNav({
 
 export function Sidebar({
   role,
-  collapsed,
-  onToggle
+  collapsed
 }: {
   role: UserRole
   collapsed: boolean
-  onToggle: () => void
 }) {
   return (
     <aside
@@ -97,19 +102,8 @@ export function Sidebar({
         collapsed ? "w-[4.6rem]" : "w-64"
       )}
     >
-      <Brand collapsed={collapsed} />
+      <SidebarHeader collapsed={collapsed} />
       <SidebarNav role={role} collapsed={collapsed} />
-      <button
-        type="button"
-        onClick={onToggle}
-        className={cn(
-          "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
-          collapsed && "justify-center px-2"
-        )}
-      >
-        {collapsed ? <PanelLeft className="size-[18px]" /> : <PanelLeftClose className="size-[18px]" />}
-        {!collapsed && <span>Collapse</span>}
-      </button>
     </aside>
   )
 }
@@ -129,9 +123,26 @@ export function MobileSidebar({
       open={open}
       onOpenChange={onOpenChange}
       showClose={false}
-      className="bg-sidebar text-sidebar-foreground w-72 sm:w-80"
+      className="bg-sidebar text-sidebar-foreground w-72 sm:w-80 p-0"
     >
-      <Brand />
+      <div className="border-sidebar-border/50 flex h-16 items-center justify-between border-b px-4">
+        <Link href="#" className="flex items-center gap-2.5">
+          <div className="bg-sidebar-primary text-sidebar-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-xl">
+            <GraduationCap className="size-5" />
+          </div>
+          <span className="text-sidebar-foreground text-sm font-semibold tracking-tight">
+            School OS
+          </span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => onOpenChange(false)}
+          className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex size-8 cursor-pointer items-center justify-center rounded-lg transition-colors"
+          aria-label="Close sidebar"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
       <SidebarNav role={role} onNavigate={() => onOpenChange(false)} />
     </Sheet>
   )

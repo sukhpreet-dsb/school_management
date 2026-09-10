@@ -39,6 +39,7 @@ model Teacher {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   classes     TeacherClass[]
+  subjects    TeacherSubject[]
 
   @@map("teacher")
 }
@@ -121,6 +122,31 @@ model TeacherClass {
   @@unique([teacherId, classId, academicYear])
   @@index([teacherId, academicYear])
   @@map("teacher_class")
+}
+
+model Subject {
+  id        String           @id @default(uuid())
+  name      String           @unique
+  code      String           @unique
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  teachers  TeacherSubject[]
+
+  @@map("subject")
+}
+
+model TeacherSubject {
+  id        String   @id @default(uuid())
+  teacherId String
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([teacherId, subjectId])
+  @@index([teacherId])
+  @@index([subjectId])
+  @@map("teacher_subject")
 }
 
 model Session {

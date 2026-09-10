@@ -11,6 +11,9 @@ export async function GET() {
       throw apiError(404, 'Teacher profile not found.');
     }
 
-    return { data: buildTeacherStats(assignment.assignedClasses), status: 200 };
+    return {
+      data: buildTeacherStats(assignment.assignedClasses, assignment.assignedSubjects),
+      status: 200
+    };
   });
 }

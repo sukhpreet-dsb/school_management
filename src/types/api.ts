@@ -22,6 +22,7 @@ export interface CreateUserBody {
   empCode?: string;
   phone?: string;
   hireDate?: string;
+  subjectIds?: string[];
 }
 
 export interface CreateStudentBody {

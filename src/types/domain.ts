@@ -16,6 +16,7 @@ export interface AuthUser {
   banned: boolean;
   createdAt: string;
   classCount?: number;
+  subjects?: Subject[];
   profile?: {
     empCode?: string;
     phone?: string | null;
@@ -23,6 +24,7 @@ export interface AuthUser {
     designation?: string | null;
     admissionNo?: string;
     classCount?: number;
+    subjects?: Subject[];
   };
 }
 

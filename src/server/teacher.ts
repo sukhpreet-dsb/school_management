@@ -15,6 +15,7 @@ export interface TeacherAssignment {
   userId: string;
   name: string;
   assignedClasses: AssignedClassInfo[];
+  assignedSubjects: Subject[];
 }
 
 function mockKeyFor(grade: number, section: string): string {
@@ -23,7 +24,7 @@ function mockKeyFor(grade: number, section: string): string {
 
 /**
  * Resolves a real auth user (by id or email) to their mock teacher profile +
- * DB Teacher row + currently assigned DB classes (enriched with mock data).
+ * DB Teacher row + currently assigned DB classes (enriched with mock data) and assigned subjects.
  */
 export async function getTeacherAssignment(input: {
   id?: string;
@@ -36,7 +37,14 @@ export async function getTeacherAssignment(input: {
     return null;
   }
 
-  const teacher = await prisma.teacher.findUnique({ where: { userId: user.id } });
+  const teacher = await prisma.teacher.findUnique({
+    where: { userId: user.id },
+    include: {
+      subjects: {
+        include: { subject: { select: { id: true, name: true, code: true } } }
+      }
+    }
+  });
   if (!teacher) {
     return null;
   }
@@ -60,16 +68,20 @@ export async function getTeacherAssignment(input: {
     };
   });
 
+  const assignedSubjects: Subject[] = teacher.subjects.map((ts) => ts.subject);
+
   return {
     teacherId: teacher.id,
     userId: user.id,
     name: user.name,
-    assignedClasses
+    assignedClasses,
+    assignedSubjects
   };
 }
 
 export function buildTeacherStats(
-  assigned: AssignedClassInfo[]
+  assigned: AssignedClassInfo[],
+  assignedSubjects?: Subject[]
 ): TeacherStats {
   const classes = assigned.map((c) => ({
     id: c.classId,
@@ -99,16 +111,19 @@ export function buildTeacherStats(
     return { className: c.name, rate: denom === 0 ? 0 : Math.round((presentish / denom) * 1000) / 10 };
   });
 
-  const subjectIds = new Set<string>();
-  for (const c of assigned) {
-    if (!c.mockKey) continue;
-    for (const cs of getClassSubjects(c.mockKey)) subjectIds.add(cs.subject.id);
-  }
+  let subjectsTaught: Subject[] = assignedSubjects ?? [];
+  if (subjectsTaught.length === 0) {
+    const subjectIds = new Set<string>();
+    for (const c of assigned) {
+      if (!c.mockKey) continue;
+      for (const cs of getClassSubjects(c.mockKey)) subjectIds.add(cs.subject.id);
+    }
 
-  const subjectsTaught: Subject[] = [...subjectIds].map((id) => {
-    const cs = getClassSubjects(assigned.find((c) => c.mockKey && subjectIds.has(id))?.mockKey ?? '').find((x) => x.subject.id === id);
-    return cs ? cs.subject : { id, name: id.replace('sub-', '').replace(/^\w/, (x) => x.toUpperCase()), code: id.replace('sub-', '').toUpperCase() };
-  });
+    subjectsTaught = [...subjectIds].map((id) => {
+      const cs = getClassSubjects(assigned.find((c) => c.mockKey && subjectIds.has(id))?.mockKey ?? '').find((x) => x.subject.id === id);
+      return cs ? cs.subject : { id, name: id.replace('sub-', '').replace(/^\w/, (x) => x.toUpperCase()), code: id.replace('sub-', '').toUpperCase() };
+    });
+  }
 
   return {
     myClasses: classes,

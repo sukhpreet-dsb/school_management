@@ -313,6 +313,29 @@ model Enrollment {
   @@map("enrollment")
 }
 
+model Subject {
+  id        String           @id @default(uuid())
+  name      String           @unique
+  code      String           @unique
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  teachers  TeacherSubject[]
+  @@map("subject")
+}
+
+model TeacherSubject {
+  id        String   @id @default(uuid())
+  teacherId String
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([teacherId, subjectId])
+  @@index([teacherId])
+  @@index([subjectId])
+  @@map("teacher_subject")
+}
+
 // Session / Account / Verification — Better Auth managed (do not rename).
 ```
 
@@ -347,9 +370,10 @@ erDiagram
 | Teacher / Student profiles | ✅ | `teacher` / `student` tables |
 | Classes (catalog) | ✅ | `class` table |
 | Teacher↔class assignments | ✅ | `teacher_class` table |
+| Teacher↔subject assignments | ✅ | `teacher_subject` table |
 | Student→class enrollments | ✅ | `enrollment` table (drives real rosters + class counts) |
 | Class rosters | ✅ | real — `enrollment` JOIN `student` |
-| Subjects per class | ⚠️ mock | `src/mock/data.ts` |
+| Subjects catalog | ✅ | `subject` table |
 | Grades & attendance | ⚠️ mock | `src/mock/data.ts` (powers teacher dashboard) |
 
 Mock data is **deterministic** (`mulberry32(20260907)`) and mirrors the query shapes a real backend would return, so swap-in is a drop-in later.
@@ -444,9 +468,15 @@ All endpoints require a session; role is enforced server side on each request.
 | `DELETE /api/admin/students/[id]` | — cascades account/profile/enrollments | `{ id }` | 401, 403, 404 |
 | `GET /api/admin/teachers/[userId]/classes` | — | `{ classIds: string[] }` | 401, 403, 404 |
 | `PUT /api/admin/teachers/[userId]/classes` | `{ classIds: string[] }` (replace-all, transactional) | `{ userId, classIds }` | 401, 403, 404, 422 (unknown id) |
+| `GET /api/admin/teachers/[userId]/subjects` | — | `{ subjectIds: string[] }` | 401, 403, 404 |
+| `PUT /api/admin/teachers/[userId]/subjects` | `{ subjectIds: string[] }` (replace-all, transactional) | `{ userId, subjectIds }` | 401, 403, 404, 422 (unknown id) |
 | `GET /api/admin/classes` | `q?`, `page=1`, `pageSize=10` (≤1000); filter grade numeric OR section/room `contains`; order `grade asc, section asc` | `Paginated<ClassCatalogItem>` | 401, 403, 422 |
 | `POST /api/admin/classes` | `{ grade: 1..12, section? (A), room? }` | `201 ClassCatalogItem` | 401, 403, 409 (duplicate), 422 |
 | `DELETE /api/admin/classes/[id]` | — | `{ id }` | 401, 403, 404 |
+| `GET /api/admin/subjects` | `q?`, `page=1`, `pageSize=10` (≤100); filter name/code `contains`; order `name asc` | `Paginated<SubjectWithTeacherCount>` | 401, 403, 422 |
+| `POST /api/admin/subjects` | `{ name, code }` | `201 Subject` | 401, 403, 409 (duplicate), 422 |
+| `DELETE /api/admin/subjects/[id]` | — | `{ id }` | 401, 403, 404 |
+| `GET /api/admin/dashboard` | — | `AdminStats` | 401, 403 |
 
 **Teacher — `src/app/api/teacher/*`**
 
@@ -455,6 +485,7 @@ All endpoints require a session; role is enforced server side on each request.
 | `GET /api/teacher/classes` | `q?`, `page=1`, `pageSize=10` (≤100) | `Paginated<TeacherClassSummary>` | 401, 403, 404 (profile) |
 | `GET /api/teacher/classes/[classId]/enrollments` | `q?` (name/email/admissionNo/guardian), `page`, `pageSize` | `Paginated<Student>` (real roster) | 401, 403 (unassigned), 404 (profile) |
 | `GET /api/teacher/students` | `q?` (name/email/admission/guardian), `classId?`, `page=1`, `pageSize=10` (≤100) | `Paginated<Student>` (across assigned classes) | 401, 403, 404 (profile), 422 |
+| `GET /api/teacher/subjects` | `q?`, `page=1`, `pageSize=10` (≤100) | `Paginated<Subject>` (assigned to teacher) | 401, 403, 404 (profile), 422 |
 | `GET /api/teacher/dashboard` | — | `TeacherStats` | 401, 403, 404 (profile) |
 
 **Health**
@@ -610,17 +641,19 @@ Navigation is role-based (`src/mock/nav.ts`). Admin and teacher areas also expos
 | Public | Landing page | — |
 | Redirect | `/` → `/dashboard` → role home | session role |
 | Admin | `/admin` Dashboard (stats & charts) | `getAdminStats()` (mock) |
-| Admin | `/admin/teachers` Teachers + Assign classes | `/api/admin/users` + `/api/admin/teachers/*` |
+| Admin | `/admin/teachers` Teachers + Assign classes & subjects | `/api/admin/users` + `/api/admin/teachers/*` |
 | Admin | `/admin/classes` Classes catalog + Add class | `/api/admin/classes` |
+| Admin | `/admin/subjects` Subjects catalog + Add subject | `/api/admin/subjects` |
 | Admin | `/admin/students` Students + Add/Edit/Delete | `/api/admin/students` |
 | Teacher | `/teacher` Dashboard | `/api/teacher/dashboard` |
 | Teacher | `/teacher/classes` My Classes | `/api/teacher/classes` |
 | Teacher | `/teacher/classes/[classId]` Roster (real) | `/api/teacher/classes/[classId]/enrollments` |
 | Teacher | `/teacher/students` Students directory | `/api/teacher/students` + `/api/teacher/classes` |
-| Teacher | Subjects · Grades · Attendance | placeholder ("Coming soon") |
+| Teacher | `/teacher/subjects` My Subjects | `/api/teacher/subjects` |
+| Teacher | Grades · Attendance | placeholder ("Coming soon") |
 | Student | `/student` stub, `student/*` nav items | stub (not built) |
 
-Nav details: Admin shows **Dashboard, Students, Teachers, Classes** (Subjects/Grades/Attendance/Users & Roles commented out). Teacher shows **Dashboard, My Classes, Students, Grades, Attendance, Subjects**. Student nav lists Dashboard/My Grades/My Attendance/My Classes/Profile (pages are stubs).
+Nav details: Admin shows **Dashboard, Students, Teachers, Classes, Subjects** (Grades/Attendance/Users & Roles commented out). Teacher shows **Dashboard, My Classes, Students, Grades, Attendance, Subjects**. Student nav lists Dashboard/My Grades/My Attendance/My Classes/Profile (pages are stubs).
 
 ---
 
@@ -633,16 +666,19 @@ Nav details: Admin shows **Dashboard, Students, Teachers, Classes** (Subjects/Gr
 | Admin users & teacher creation | ✅ Implemented |
 | Class catalog CRUD | ✅ Implemented (create/list/delete) |
 | Assign classes to teachers | ✅ Implemented (replace-all, transactional) |
+| **Subjects catalog CRUD** | ✅ Implemented (create/list/delete) |
+| **Assign subjects to teachers** | ✅ Implemented (during creation & via assign sheet) |
+| **Teacher subjects view** | ✅ Implemented (display assigned subjects for logged-in teacher) |
 | **Enrollment (real `enrollment` table)** | ✅ Implemented |
 | Admin student management (create/enroll/edit/move/delete) | ✅ Implemented |
 | Real class & roster counts | ✅ Implemented (enrollment-driven) |
 | Teacher dashboard / classes / roster | ✅ Implemented (real rosters; grades/attendance mock-enriched) |
 | Teacher students directory | ✅ Implemented (across assigned classes + search & filter) |
+| **Admin dashboard endpoint & stats** | ✅ Implemented (real DB counts for students, teachers, classes, subjects, sizes & enrollments) |
 | Server-side pagination + search | ✅ Implemented (all lists) |
 | Modal dialogs, responsive shell, dark mode | ✅ Implemented |
-| Real `Grade`/`Attendance`/`Subject` DB tables | 🔜 Backlog |
+| Real `Grade`/`Attendance` DB tables | 🔜 Backlog |
 | Student area (grades/attendance/profile/classes) | 🔜 Backlog |
-| Admin dashboard as real endpoint (`/api/admin/dashboard`) | 🔜 Backlog |
 | Grades & attendance entry UIs | 🔜 Backlog |
 | Admin subjects management | 🔜 Backlog |
 | Email sender domain swap | 🔜 Backlog (approved) |

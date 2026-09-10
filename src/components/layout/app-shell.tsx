@@ -25,9 +25,17 @@ export function AppShell({
     setMobileOpen(false)
   }, [pathname])
 
+  const handleToggleSidebar = React.useCallback(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setMobileOpen((prev) => !prev)
+    } else {
+      setCollapsed((prev) => !prev)
+    }
+  }, [])
+
   return (
     <div className="bg-muted/40 min-h-svh">
-      <Sidebar role={role} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
+      <Sidebar role={role} collapsed={collapsed} />
       <MobileSidebar role={role} open={mobileOpen} onOpenChange={setMobileOpen} />
 
       <div
@@ -36,7 +44,7 @@ export function AppShell({
           collapsed ? "lg:pl-[4.6rem]" : "lg:pl-64"
         )}
       >
-        <Header role={role} user={user} onMenuClick={() => setMobileOpen(true)} />
+        <Header role={role} user={user} onMenuClick={handleToggleSidebar} />
         <main className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">{children}</main>
       </div>
     </div>

@@ -49,10 +49,11 @@ export async function ensureTeacherProfile(input: {
   phone?: string | null;
   hireDate?: Date | string | null;
   designation?: string | null;
+  subjectIds?: string[];
 }): Promise<void> {
   const empCode = input.empCode?.trim() || (await nextEmpCode());
 
-  await prisma.teacher.upsert({
+  const teacher = await prisma.teacher.upsert({
     where: { userId: input.userId },
     update: {
       ...(input.empCode?.trim() ? { empCode: input.empCode.trim() } : {}),
@@ -68,6 +69,23 @@ export async function ensureTeacherProfile(input: {
       ...(input.designation !== undefined ? { designation: input.designation } : {})
     }
   });
+
+  if (input.subjectIds !== undefined) {
+    const uniqueSubjectIds = [...new Set(input.subjectIds)];
+    await prisma.$transaction(async (tx) => {
+      await tx.teacherSubject.deleteMany({
+        where: { teacherId: teacher.id }
+      });
+      if (uniqueSubjectIds.length > 0) {
+        await tx.teacherSubject.createMany({
+          data: uniqueSubjectIds.map((subjectId) => ({
+            teacherId: teacher.id,
+            subjectId
+          }))
+        });
+      }
+    });
+  }
 }
 
 export async function ensureStudentProfile(input: {

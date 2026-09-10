@@ -23,11 +23,13 @@ function toAuthUser(user: {
     hireDate: Date | null;
     designation: string | null;
     _count?: { classes: number };
+    subjects?: Array<{ subject: { id: string; name: string; code: string } }>;
   } | null;
   studentProfile?: { admissionNo: string } | null;
 }): AuthUser {
   const role = Array.isArray(user.role) ? user.role[0] : user.role;
   const normalized = normalizeRole(role);
+  const teacherSubjects = user.teacherProfile?.subjects?.map((ts) => ts.subject);
 
   return {
     id: user.id,
@@ -38,6 +40,7 @@ function toAuthUser(user: {
     emailVerified: user.emailVerified ?? false,
     banned: user.banned ?? false,
     createdAt: new Date(user.createdAt ?? Date.now()).toISOString(),
+    subjects: normalized === 'teacher' ? teacherSubjects : undefined,
     profile:
       normalized === 'teacher' && user.teacherProfile
         ? {
@@ -45,7 +48,8 @@ function toAuthUser(user: {
             phone: user.teacherProfile.phone,
             hireDate: user.teacherProfile.hireDate?.toISOString() ?? null,
             designation: user.teacherProfile.designation,
-            classCount: user.teacherProfile._count?.classes ?? 0
+            classCount: user.teacherProfile._count?.classes ?? 0,
+            subjects: teacherSubjects
           }
         : normalized === 'student' && user.studentProfile
           ? { admissionNo: user.studentProfile.admissionNo }
@@ -92,7 +96,12 @@ export async function GET(request: NextRequest) {
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
         include: {
-          teacherProfile: { include: { _count: { select: { classes: true } } } },
+          teacherProfile: {
+            include: {
+              _count: { select: { classes: true } },
+              subjects: { include: { subject: { select: { id: true, name: true, code: true } } } }
+            }
+          },
           studentProfile: true
         }
       }),
@@ -119,7 +128,8 @@ const createUserSchema = z.object({
   role: z.enum(ROLES).default('student'),
   empCode: z.string().trim().max(20).optional(),
   phone: z.string().trim().max(30).optional(),
-  hireDate: z.string().trim().optional()
+  hireDate: z.string().trim().optional(),
+  subjectIds: z.array(z.string()).optional()
 });
 
 export async function POST(request: NextRequest) {
@@ -153,7 +163,8 @@ export async function POST(request: NextRequest) {
           userId: result.user.id,
           empCode: body.empCode,
           phone: body.phone ?? null,
-          hireDate: body.hireDate ?? null
+          hireDate: body.hireDate ?? null,
+          subjectIds: body.subjectIds
         });
       } else if (body.role === 'student') {
         await ensureStudentProfile({ userId: result.user.id });
@@ -164,6 +175,19 @@ export async function POST(request: NextRequest) {
       throw apiError(500, 'Account created but profile setup failed. Please try again.');
     }
 
-    return { data: toAuthUser(result.user), status: 201 };
+    const createdUser = await prisma.user.findUnique({
+      where: { id: result.user.id },
+      include: {
+        teacherProfile: {
+          include: {
+            _count: { select: { classes: true } },
+            subjects: { include: { subject: { select: { id: true, name: true, code: true } } } }
+          }
+        },
+        studentProfile: true
+      }
+    });
+
+    return { data: toAuthUser(createdUser ?? result.user), status: 201 };
   });
 }
