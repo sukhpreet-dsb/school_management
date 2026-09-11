@@ -14,7 +14,7 @@ export function AppShell({
   children
 }: {
   role: UserRole
-  user: { name: string; email: string; role: UserRole }
+  user: { name: string; email: string; role: UserRole; image?: string | null }
   children: React.ReactNode
 }) {
   const [collapsed, setCollapsed] = React.useState(false)

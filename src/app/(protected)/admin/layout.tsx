@@ -11,7 +11,12 @@ export default async function AdminLayout({
   return (
     <AppShell
       role="admin"
-      user={{ name: session.user.name, email: session.user.email, role: 'admin' }}
+      user={{
+        name: session.user.name,
+        email: session.user.email,
+        role: "admin",
+        image: session.user.image
+      }}
     >
       {children}
     </AppShell>

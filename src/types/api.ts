@@ -47,3 +47,23 @@ export interface UpdateStudentBody {
   guardianPhone?: string;
   schoolClassId?: string;
 }
+
+export interface UpdateTeacherBody {
+  name?: string;
+  phone?: string | null;
+  designation?: string | null;
+  empCode?: string;
+  hireDate?: string | null;
+}
+
+export interface CreateClassBody {
+  grade: number;
+  section: string;
+  room?: string;
+}
+
+export interface UpdateClassBody {
+  grade?: number;
+  section?: string;
+  room?: string | null;
+}

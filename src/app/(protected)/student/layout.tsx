@@ -7,12 +7,15 @@ export default async function StudentLayout({
   children: React.ReactNode;
 }) {
   const session = await requireRole('student');
-  console.log(session,"session");
-
   return (
     <AppShell
       role="student"
-      user={{ name: session.user.name, email: session.user.email, role: 'student' }}
+      user={{
+        name: session.user.name,
+        email: session.user.email,
+        role: "student",
+        image: session.user.image
+      }}
     >
       {children}
     </AppShell>

@@ -11,7 +11,12 @@ export default async function TeacherLayout({
   return (
     <AppShell
       role="teacher"
-      user={{ name: session.user.name, email: session.user.email, role: 'teacher' }}
+      user={{
+        name: session.user.name,
+        email: session.user.email,
+        role: "teacher",
+        image: session.user.image
+      }}
     >
       {children}
     </AppShell>

@@ -2,7 +2,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetcher } from '@/lib/api';
-import type { CreateStudentBody, CreateUserBody, UpdateStudentBody } from '@/types/api';
+import type { CreateStudentBody, CreateUserBody, UpdateStudentBody, UpdateTeacherBody } from '@/types/api';
 import type {
   AdminStats,
   AuthUser,
@@ -11,10 +11,34 @@ import type {
   Student,
   Subject,
   TeacherClassSummary,
-  TeacherStats
+  TeacherStats,
+  UpdateProfileBody,
+  UserProfile
 } from '@/types/domain';
 
 export type SubjectWithTeacherCount = Subject & { teacherCount: number };
+
+export function useProfile() {
+  return useQuery({
+    queryKey: ['profile', 'me'],
+    queryFn: () => fetcher<UserProfile>('/api/profile')
+  });
+}
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateProfileBody) =>
+      fetcher<UserProfile>('/api/profile', { method: 'PATCH', body }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['profile', 'me'], data);
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'students'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+    }
+  });
+}
 
 export function useAdminDashboard() {
   return useQuery({
@@ -42,6 +66,18 @@ export function useCreateTeacher() {
   return useMutation({
     mutationFn: (body: CreateUserBody) =>
       fetcher<AuthUser>('/api/admin/users', { method: 'POST', body }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    }
+  });
+}
+
+export function useUpdateTeacher() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ userId, ...body }: UpdateTeacherBody & { userId: string }) =>
+      fetcher<AuthUser>(`/api/admin/teachers/${userId}`, { method: 'PATCH', body }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
     }
@@ -143,6 +179,22 @@ export function useCreateClass() {
       fetcher<ClassCatalogItem>('/api/admin/classes', { method: 'POST', body }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'classes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher'] });
+    }
+  });
+}
+
+export function useUpdateClass() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ classId, ...body }: { classId: string; grade?: number; section?: string; room?: string | null }) =>
+      fetcher<ClassCatalogItem>(`/api/admin/classes/${classId}`, { method: 'PATCH', body }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'classes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'students'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher'] });
     }
   });
 }
@@ -154,6 +206,7 @@ export function useDeleteClass() {
       fetcher<{ id: string }>(`/api/admin/classes/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'classes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
       queryClient.invalidateQueries({ queryKey: ['teacher'] });
     }

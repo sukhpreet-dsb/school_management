@@ -27,11 +27,146 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useClasses, useCreateClass, useDeleteClass } from '@/lib/queries';
+import { useClasses, useCreateClass, useDeleteClass, useUpdateClass } from '@/lib/queries';
 import { useSafePage } from '@/lib/use-safe-page';
 import type { ClassCatalogItem } from '@/types/domain';
 
 const GRADES = Array.from({ length: 12 }, (_, i) => i + 1);
+
+const editClassSchema = z.object({
+  grade: z.string().min(1, 'Select a grade.'),
+  section: z.string().trim().toUpperCase().min(1, 'Section is required.').max(4),
+  room: z.string().trim().max(30).optional()
+});
+
+type EditClassValues = z.infer<typeof editClassSchema>;
+
+function EditClassDialog({
+  item,
+  open,
+  onOpenChange
+}: {
+  item: ClassCatalogItem;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const updateClass = useUpdateClass();
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm<EditClassValues>({
+    resolver: zodResolver(editClassSchema),
+    values: {
+      grade: String(item.grade),
+      section: item.section,
+      room: item.room ?? ''
+    }
+  });
+
+  async function onSubmit(values: EditClassValues) {
+    setError(null);
+    try {
+      await updateClass.mutateAsync({
+        classId: item.id,
+        grade: Number(values.grade),
+        section: values.section || 'A',
+        room: values.room || null
+      });
+      toast.success(`Class ${values.grade} ${values.section} updated.`);
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update class.');
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <DialogHeader>
+          <DialogTitle>Edit class</DialogTitle>
+          <DialogDescription>
+            Update the grade, section, or room assignment for this class.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className='flex flex-col gap-5 py-2'>
+          {error && (
+            <Alert variant='destructive'>
+              <AlertTriangleIcon className='h-4 w-4' />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <FieldGroup>
+            <Controller
+              name='grade'
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor={`edit-grade-${item.id}`}>Grade</FieldLabel>
+                  <Select {...field} id={`edit-grade-${item.id}`}>
+                    {GRADES.map((g) => (
+                      <option key={g} value={g}>
+                        Class {g}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+            />
+
+            <Controller
+              name='section'
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={`edit-section-${item.id}`}>Section</FieldLabel>
+                  <Input
+                    {...field}
+                    id={`edit-section-${item.id}`}
+                    placeholder='e.g. A, B'
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name='room'
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={`edit-room-${item.id}`}>Room (optional)</FieldLabel>
+                  <Input
+                    {...field}
+                    id={`edit-room-${item.id}`}
+                    placeholder='e.g. Room 101'
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+          </FieldGroup>
+        </div>
+
+        <DialogFooter>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+            disabled={updateClass.isPending}
+          >
+            Cancel
+          </Button>
+          <Button type='submit' disabled={updateClass.isPending}>
+            {updateClass.isPending ? <Spinner /> : 'Save changes'}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
+  );
+}
 
 const columns: ColumnDef<ClassCatalogItem>[] = [
   {
@@ -54,27 +189,42 @@ const columns: ColumnDef<ClassCatalogItem>[] = [
   {
     id: 'actions',
     header: '',
-    cell: ({ row }) => <DeleteClassButton item={row.original} />
+    cell: ({ row }) => <ClassActions item={row.original} />
   }
 ];
 
-function DeleteClassButton({ item }: { item: ClassCatalogItem }) {
+function ClassActions({ item }: { item: ClassCatalogItem }) {
+  const [editOpen, setEditOpen] = useState(false);
   const remove = useDeleteClass();
   return (
-    <Button
-      variant='ghost'
-      size='sm'
-      onClick={() => {
-        remove.mutate(item.id, {
-          onSuccess: () => toast.success(`${item.name} deleted.`),
-          onError: (err) => toast.error(err instanceof Error ? err.message : 'Delete failed.')
-        });
-      }}
-      disabled={remove.isPending}
-      className='text-destructive hover:text-destructive'
-    >
-      <Trash2Icon />
-    </Button>
+    <div className='flex items-center gap-1.5 justify-end'>
+      <Button
+        variant='outline'
+        size='sm'
+        onClick={() => setEditOpen(true)}
+      >
+        Edit
+      </Button>
+      <Button
+        variant='ghost'
+        size='sm'
+        onClick={() => {
+          remove.mutate(item.id, {
+            onSuccess: () => toast.success(`${item.name} deleted.`),
+            onError: (err) => toast.error(err instanceof Error ? err.message : 'Delete failed.')
+          });
+        }}
+        disabled={remove.isPending}
+        className='text-destructive hover:text-destructive'
+      >
+        <Trash2Icon />
+      </Button>
+      <EditClassDialog
+        item={item}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
+    </div>
   );
 }
 

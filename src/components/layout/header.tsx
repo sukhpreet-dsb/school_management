@@ -11,7 +11,7 @@ import { NAV, roleHomePath } from "@/mock/nav"
 import { ROLE_LABELS } from "@/lib/roles"
 import type { UserRole } from "@/types/domain"
 import { authClient } from "@/lib/auth-client"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -79,7 +79,11 @@ function initialsOf(name: string): string {
     .toUpperCase()
 }
 
-function UserMenu({ user }: { user: { name: string; email: string; role: UserRole } }) {
+function UserMenu({
+  user
+}: {
+  user: { name: string; email: string; role: UserRole; image?: string | null }
+}) {
   const router = useRouter()
 
   async function handleLogout() {
@@ -100,9 +104,10 @@ function UserMenu({ user }: { user: { name: string; email: string; role: UserRol
         <button
           type="button"
           aria-label="Account menu"
-          className="hover:bg-muted flex items-center gap-2.5 rounded-2xl p-1 transition-colors"
+          className="hover:bg-muted flex items-center gap-2.5 rounded-2xl p-1 transition-colors cursor-pointer"
         >
           <Avatar size="sm">
+            {user.image && <AvatarImage src={user.image} alt={user.name} />}
             <AvatarFallback>{initialsOf(user.name)}</AvatarFallback>
           </Avatar>
         </button>
@@ -116,7 +121,7 @@ function UserMenu({ user }: { user: { name: string; email: string; role: UserRol
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuItem icon={<UserRound />}>
-        <Link href={roleHomePath(user.role)} className="flex-1">
+        <Link href={`/${user.role}/profile`} className="flex-1">
           Profile
         </Link>
       </DropdownMenuItem>
@@ -133,7 +138,7 @@ export function Header({
   onMenuClick
 }: {
   role: UserRole
-  user: { name: string; email: string; role: UserRole }
+  user: { name: string; email: string; role: UserRole; image?: string | null }
   onMenuClick: () => void
 }) {
   const pathname = usePathname()

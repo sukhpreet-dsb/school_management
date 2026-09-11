@@ -28,12 +28,196 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useCreateTeacher, useSubjectCatalog, useTeachers } from '@/lib/queries';
+import { useCreateTeacher, useSubjectCatalog, useTeachers, useUpdateTeacher } from '@/lib/queries';
 import { useSafePage } from '@/lib/use-safe-page';
 import { AssignClassesSheet } from '@/components/admin/assign-classes-sheet';
 import { AssignSubjectsSheet } from '@/components/admin/assign-subjects-sheet';
 import { cn } from '@/lib/utils';
 import type { AuthUser } from '@/types/domain';
+
+const editTeacherSchema = z.object({
+  name: z.string().min(2, 'Name is required.').max(80, 'Name must be at most 80 characters.'),
+  empCode: z.string().trim().max(20, 'Emp code must be at most 20 characters.').optional(),
+  phone: z.string().trim().max(30, 'Phone must be at most 30 characters.').optional(),
+  designation: z.string().trim().max(100, 'Designation must be at most 100 characters.').optional(),
+  hireDate: z.string().trim().optional()
+});
+
+type EditTeacherValues = z.infer<typeof editTeacherSchema>;
+
+function EditTeacherDialog({
+  user,
+  open,
+  onOpenChange
+}: {
+  user: AuthUser;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const updateTeacher = useUpdateTeacher();
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm<EditTeacherValues>({
+    resolver: zodResolver(editTeacherSchema),
+    values: {
+      name: user.name,
+      empCode: user.profile?.empCode ?? '',
+      phone: user.profile?.phone ?? '',
+      designation: user.profile?.designation ?? '',
+      hireDate: user.profile?.hireDate ? user.profile.hireDate.slice(0, 10) : ''
+    }
+  });
+
+  async function onSubmit(values: EditTeacherValues) {
+    setError(null);
+    try {
+      await updateTeacher.mutateAsync({
+        userId: user.id,
+        name: values.name,
+        empCode: values.empCode || undefined,
+        phone: values.phone || null,
+        designation: values.designation || null,
+        hireDate: values.hireDate || null
+      });
+      toast.success('Teacher details updated successfully.');
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update teacher.');
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <DialogHeader>
+          <DialogTitle>Edit teacher</DialogTitle>
+          <DialogDescription>
+            Update faculty personal and institutional details.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className='flex flex-col gap-5 py-2'>
+          {error && (
+            <Alert variant='destructive'>
+              <AlertTriangleIcon className='h-4 w-4' />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <FieldGroup>
+            <Controller
+              name='name'
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={`edit-name-${user.id}`}>Full name</FieldLabel>
+                  <Input
+                    {...field}
+                    id={`edit-name-${user.id}`}
+                    type='text'
+                    placeholder='e.g. Priya Sharma'
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Field>
+              <FieldLabel>Email</FieldLabel>
+              <Input value={user.email} disabled className='bg-muted/50 cursor-not-allowed' />
+            </Field>
+
+            <Controller
+              name='empCode'
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={`edit-empCode-${user.id}`}>Emp code</FieldLabel>
+                  <Input
+                    {...field}
+                    id={`edit-empCode-${user.id}`}
+                    type='text'
+                    placeholder='e.g. TCH-001'
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name='phone'
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={`edit-phone-${user.id}`}>Phone</FieldLabel>
+                  <Input
+                    {...field}
+                    id={`edit-phone-${user.id}`}
+                    type='tel'
+                    placeholder='e.g. +91 98XXXXXXXX'
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name='designation'
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={`edit-designation-${user.id}`}>Designation</FieldLabel>
+                  <Input
+                    {...field}
+                    id={`edit-designation-${user.id}`}
+                    type='text'
+                    placeholder='e.g. Senior Science Teacher'
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name='hireDate'
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={`edit-hireDate-${user.id}`}>Hire date</FieldLabel>
+                  <Input
+                    {...field}
+                    id={`edit-hireDate-${user.id}`}
+                    type='date'
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+          </FieldGroup>
+        </div>
+
+        <DialogFooter>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+            disabled={updateTeacher.isPending}
+          >
+            Cancel
+          </Button>
+          <Button type='submit' disabled={updateTeacher.isPending}>
+            {updateTeacher.isPending ? <Spinner /> : 'Save changes'}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
+  );
+}
 
 const columns: ColumnDef<AuthUser>[] = [
   {
@@ -102,10 +286,19 @@ const columns: ColumnDef<AuthUser>[] = [
 ];
 
 function AssignAction({ user }: { user: AuthUser }) {
+  const [editOpen, setEditOpen] = useState(false);
   const [classesOpen, setClassesOpen] = useState(false);
   const [subjectsOpen, setSubjectsOpen] = useState(false);
   return (
     <div className='flex items-center gap-1.5'>
+      <Button
+        variant='outline'
+        size='sm'
+        onClick={() => setEditOpen(true)}
+        className='whitespace-nowrap'
+      >
+        Edit
+      </Button>
       <Button
         variant='outline'
         size='sm'
@@ -122,6 +315,11 @@ function AssignAction({ user }: { user: AuthUser }) {
       >
         Classes
       </Button>
+      <EditTeacherDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        user={user}
+      />
       <AssignSubjectsSheet
         open={subjectsOpen}
         onOpenChange={setSubjectsOpen}

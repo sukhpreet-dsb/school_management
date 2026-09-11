@@ -10,12 +10,14 @@ Single-school management that runs in three role-scoped areas (**admin**, **teac
 
 - Email/password sign-up, sign-in, sign-out, forgot/reset password.
 - Admin management of **user accounts** (teachers/students) and a **class catalog** (Grades 1–12 + section).
+- Admin management of a **subject catalog** (code + name) and assigning **subjects to teachers**.
 - Admin creation of **students** (login + profile) and **enrollment** into one class, with edit/move and delete.
 - Admin assignment of **classes to teachers** (stored in the database).
-- Teacher **dashboard**, **My Classes**, and class **roster** views — real students, scoped strictly to the classes assigned to them.
+- Admin **dashboard** with live PostgreSQL counts and metrics for students, teachers, classes, subjects, and class sizes.
+- Teacher **dashboard**, **My Classes**, **My Subjects**, class **roster**, and **student directory** views — real students and subjects, scoped strictly to the classes and subjects assigned to them.
 - Server-driven **pagination + search** on every list.
 
-Users, profiles, classes, teacher–class assignments, and student **enrollments are real PostgreSQL data**. Subjects, grades, and attendance are still served from **deterministic mock data** (same shapes as the future APIs) for chart enrichment, while rosters are now real.
+Users, profiles, classes, subjects, teacher–class/subject assignments, and student **enrollments are real PostgreSQL data**. Only grades and attendance charts are currently enriched with **deterministic mock data** (same shapes as the future APIs).
 
 ```mermaid
 flowchart LR
@@ -32,7 +34,7 @@ flowchart LR
     subgraph Server["Next.js Server (App Router)"]
         FET --> RH["Role-namespaced route handlers<br/>/api/admin/* /api/teacher/*"]
         RH --> GATE["requireApiRole(...)<br/>(401 / 403)"]
-        GATE --> SVC["Server services<br/>getTeacherAssignment · buildTeacherStats"]
+        GATE --> SVC["Server services<br/>getTeacherAssignment · getDbAdminStats · subjects"]
         SVC --> PRISMA["Prisma ORM"]
         SVC --> MOCK["Deterministic mock data<br/>src/mock/data.ts"]
     end
@@ -69,31 +71,41 @@ flowchart LR
 prisma/
   schema.prisma                      # Real data model
   migrations/…20260908095621_…/      # Class + TeacherClass tables + seeded mirror classes
+  migrations/…20260909054747_…/      # Enrollment table + status enum
+  migrations/…20260909095000_…/      # Subject + TeacherSubject tables
 src/
   app/
     (auth)/                           # /login /signup /forgot-password /reset-password
     (public)/                         # Landing page (logged out)
     (protected)/
       dashboard/                      # Role redirect: /dashboard -> /admin | /teacher | /student
-      admin/                          # /admin (dashboard) · /admin/teachers · /admin/classes · /admin/students
-      teacher/                        # /teacher (dashboard) · /teacher/classes [/classId]
-      student/                        # Student stub (under construction)
+      admin/                          # /admin (dashboard) · /admin/teachers · /admin/classes · /admin/students · /admin/subjects · /admin/profile
+      teacher/                        # /teacher (dashboard) · /teacher/classes [/classId] · /teacher/students · /teacher/subjects · /teacher/profile
+      student/                        # /student/profile · Student stub (under construction)
     api/
       auth/[...all]/route.ts          # Better Auth catch-all (GET/POST)
       health/route.ts                 # DB health check
+      profile/route.ts                # GET user profile · PATCH update profile
+      upload/sign/route.ts            # POST Cloudinary pre-signed upload parameters
       admin/users/route.ts            # GET list · POST create
       admin/students/route.ts         # GET list · POST create+enroll
       admin/students/[id]/route.ts    # PATCH (profile/move class) · DELETE
-      admin/teachers/[userId]/classes/route.ts  # GET current · PUT replace assignments
+      admin/teachers/[userId]/classes/route.ts   # GET current · PUT replace class assignments
+      admin/teachers/[userId]/subjects/route.ts  # GET current · PUT replace subject assignments
       admin/classes/route.ts          # GET list · POST create
       admin/classes/[id]/route.ts     # DELETE
+      admin/subjects/route.ts         # GET list · POST create
+      admin/subjects/[id]/route.ts    # DELETE
+      admin/dashboard/route.ts        # GET live DB stats
       teacher/classes/route.ts        # GET My Classes (paginated)
       teacher/classes/[classId]/enrollments/route.ts  # GET real roster (paginated)
       teacher/students/route.ts       # GET student directory across assigned classes (paginated)
+      teacher/subjects/route.ts       # GET assigned subjects for logged-in teacher (paginated)
       teacher/dashboard/route.ts      # GET teacher stats
   components/
-    admin/   teachers-manager · classes-manager · assign-classes-sheet · students-manager
-    teacher/ teacher-dashboard · my-classes · class-roster · teacher-students-manager
+    admin/   teachers-manager · classes-manager · assign-classes-sheet · assign-subjects-sheet · students-manager · subjects-manager
+    teacher/ teacher-dashboard · my-classes · class-roster · teacher-students-manager · my-subjects
+    profile/ avatar-upload · profile-info-form · change-password-form · profile-page-view
     data-table/ data-table.tsx        # client & server mode (pagination/search)
     ui/        dialog · sheet · table · … (shadcn)
   lib/
@@ -104,13 +116,17 @@ src/
     profiles.ts                       # Teacher/Student profile upserts + auto codes
     roles.ts                          # role helpers/normalization
   server/
+    admin.ts                          # getDbAdminStats live metrics service
     auth.ts                           # getSession / requireSession / requireRole (pages)
     api-auth.ts                       # requireApiRole / handleApiRoute / apiError (routes)
+    cloudinary.ts                     # Cloudinary pre-signed SHA-1 signature generator
+    profile.ts                        # getUserProfile & updateUserProfile service
     teacher.ts                        # assignment & stats services
     students.ts                       # student create/enroll/list/roster/update/delete
+    subjects.ts                       # subjects catalog & teacher-subject assignments
     user.ts                           # isAuthenticated helper
   mock/
-    data.ts                           # deterministic rosters/subjects/grades/attendance
+    data.ts                           # deterministic grades/attendance
     nav.ts                            # per-role navigation
   types/
     domain.ts                         # shared DTO types
@@ -392,6 +408,7 @@ Mock data is **deterministic** (`mulberry32(20260907)`) and mirrors the query sh
 | 7 | B | Room 106 | 2026-2027 |
 
 - Migration `20260909054747_add_enrollment_table` adds the **`enrollment`** table (+ `enrollment_status` enum) with compound uniqueness `(studentId, schoolClassId, academicYear)` — applied by `bun run migrate`.
+- Migration `20260909095000_add_subject_and_teacher_subject_tables` adds the **`subject`** catalog table and **`teacher_subject`** join table with uniqueness on `(teacherId, subjectId)`.
 - There is **no account seeding** — all accounts/profiles are created through the app.
 
 ---
@@ -406,10 +423,14 @@ Mock data is **deterministic** (`mulberry32(20260907)`) and mirrors the query sh
 | Students (create, list, edit/move class, delete) | R/W | — | — (stub) |
 | Student→class enrollments | R/W (assign/move/delete) | R (read own assigned rosters) | — (stub) |
 | Teacher↔class assignments | R/W | R (own assigned only) | — |
+| Teacher↔subject assignments | R/W | R (own assigned only) | — |
 | Class catalog (add/delete/list) | R/W | R (own assigned) | — (stub) |
+| Subject catalog (add/delete/list) | R/W | — | — (stub) |
 | Class roster | — | R (own assigned, 403 otherwise) | — (stub) |
-| Dashboard | R (mock overview) | R (own stats) | stub |
-| Grades / Attendance / Subjects | planned | planned | planned |
+| Teacher My Subjects | — | R (own assigned) | — (stub) |
+| Teacher Student Directory | — | R (across assigned classes) | — (stub) |
+| Dashboard | R (real DB overview & metrics) | R (own stats) | stub |
+| Grades / Attendance | planned | planned | planned |
 
 ---
 
@@ -456,12 +477,21 @@ All endpoints require a session; role is enforced server side on each request.
 | Forgot / reset | `POST /api/auth/forgot-password` · `/reset-password` |
 | Admin plugin (ban, impersonate…) | `POST /api/auth/admin/*` |
 
+**Profile & Upload — `src/app/api/profile/*` & `src/app/api/upload/*`**
+
+| Method & Path | Query / Body | Response | Errors |
+|---|---|---|---|
+| `GET /api/profile` | — (reads session user) | `UserProfile` (user + teacher/student details) | 401, 404 |
+| `PATCH /api/profile` | `{ name?, image?, phone?, dob?, gender?, address?, guardianName?, guardianPhone? }` | `UserProfile` | 401, 404, 422 |
+| `POST /api/upload/sign` | — | `{ signature, timestamp, apiKey, cloudName, folder }` | 401, 500 (missing credentials) |
+
 **Admin — `src/app/api/admin/*`**
 
 | Method & Path | Query / Body | Response | Errors |
 |---|---|---|---|
 | `GET /api/admin/users` | `role?`, `q?`, `page=1`, `pageSize=20` (≤100); filter name/email `contains`; order `createdAt desc` | `Paginated<AuthUser>` | 401, 403, 422 |
 | `POST /api/admin/users` | `{ name, email, password≥8, role, empCode?, phone?, hireDate? }` | `201 AuthUser` | 401, 403, 409 (email/emp code), 422, 500 |
+| `PATCH /api/admin/teachers/[userId]` | `{ name?, phone?, designation?, empCode?, hireDate? }` | `AuthUser` | 401, 403, 404, 409 (empCode in use), 422 |
 | `GET /api/admin/students` | `q?` (name/email/admission/guardian), `page=1`, `pageSize=10` (≤100) | `Paginated<Student>` (with `currentClass`) | 401, 403, 422 |
 | `POST /api/admin/students` | `{ name, email, password≥8, schoolClassId, admissionNo?, dob?, gender?, address?, guardianName?, guardianPhone? }` → account + profile + **one** enrollment | `201 Student` | 401, 403, 409 (email/admission no), 404 (class), 422, 500 |
 | `PATCH /api/admin/students/[id]` | `{ name?, dob?, gender?, address?, guardianName?, guardianPhone?, schoolClassId? }` — `schoolClassId` moves the student to another class | `Student` | 401, 403, 404, 409 (already enrolled), 422 |
@@ -472,6 +502,7 @@ All endpoints require a session; role is enforced server side on each request.
 | `PUT /api/admin/teachers/[userId]/subjects` | `{ subjectIds: string[] }` (replace-all, transactional) | `{ userId, subjectIds }` | 401, 403, 404, 422 (unknown id) |
 | `GET /api/admin/classes` | `q?`, `page=1`, `pageSize=10` (≤1000); filter grade numeric OR section/room `contains`; order `grade asc, section asc` | `Paginated<ClassCatalogItem>` | 401, 403, 422 |
 | `POST /api/admin/classes` | `{ grade: 1..12, section? (A), room? }` | `201 ClassCatalogItem` | 401, 403, 409 (duplicate), 422 |
+| `PATCH /api/admin/classes/[id]` | `{ grade?: 1..12, section?, room? }` | `ClassCatalogItem` | 401, 403, 404, 409 (duplicate), 422 |
 | `DELETE /api/admin/classes/[id]` | — | `{ id }` | 401, 403, 404 |
 | `GET /api/admin/subjects` | `q?`, `page=1`, `pageSize=10` (≤100); filter name/code `contains`; order `name asc` | `Paginated<SubjectWithTeacherCount>` | 401, 403, 422 |
 | `POST /api/admin/subjects` | `{ name, code }` | `201 Subject` | 401, 403, 409 (duplicate), 422 |
@@ -640,18 +671,21 @@ Navigation is role-based (`src/mock/nav.ts`). Admin and teacher areas also expos
 | Auth | Login, Sign up, Forgot password, Reset password | Better Auth |
 | Public | Landing page | — |
 | Redirect | `/` → `/dashboard` → role home | session role |
-| Admin | `/admin` Dashboard (stats & charts) | `getAdminStats()` (mock) |
+| Admin | `/admin` Dashboard (stats & charts) | `getDbAdminStats()` (real PostgreSQL stats & totals) |
 | Admin | `/admin/teachers` Teachers + Assign classes & subjects | `/api/admin/users` + `/api/admin/teachers/*` |
 | Admin | `/admin/classes` Classes catalog + Add class | `/api/admin/classes` |
 | Admin | `/admin/subjects` Subjects catalog + Add subject | `/api/admin/subjects` |
 | Admin | `/admin/students` Students + Add/Edit/Delete | `/api/admin/students` |
+| Admin | `/admin/profile` Admin Profile & Avatar | `/api/profile` + `/api/upload/sign` |
 | Teacher | `/teacher` Dashboard | `/api/teacher/dashboard` |
 | Teacher | `/teacher/classes` My Classes | `/api/teacher/classes` |
 | Teacher | `/teacher/classes/[classId]` Roster (real) | `/api/teacher/classes/[classId]/enrollments` |
 | Teacher | `/teacher/students` Students directory | `/api/teacher/students` + `/api/teacher/classes` |
 | Teacher | `/teacher/subjects` My Subjects | `/api/teacher/subjects` |
+| Teacher | `/teacher/profile` Teacher Profile & Avatar | `/api/profile` + `/api/upload/sign` |
 | Teacher | Grades · Attendance | placeholder ("Coming soon") |
-| Student | `/student` stub, `student/*` nav items | stub (not built) |
+| Student | `/student/profile` Student Profile & Avatar | `/api/profile` + `/api/upload/sign` |
+| Student | `/student` stub, other `student/*` nav items | stub (not built) |
 
 Nav details: Admin shows **Dashboard, Students, Teachers, Classes, Subjects** (Grades/Attendance/Users & Roles commented out). Teacher shows **Dashboard, My Classes, Students, Grades, Attendance, Subjects**. Student nav lists Dashboard/My Grades/My Attendance/My Classes/Profile (pages are stubs).
 
@@ -664,23 +698,25 @@ Nav details: Admin shows **Dashboard, Students, Teachers, Classes, Subjects** (G
 | Auth (email/password, sessions, reset) | ✅ Implemented |
 | Roles + page/route guards | ✅ Implemented |
 | Admin users & teacher creation | ✅ Implemented |
-| Class catalog CRUD | ✅ Implemented (create/list/delete) |
+| Class catalog CRUD | ✅ Implemented (create/list/edit/delete) |
 | Assign classes to teachers | ✅ Implemented (replace-all, transactional) |
-| **Subjects catalog CRUD** | ✅ Implemented (create/list/delete) |
-| **Assign subjects to teachers** | ✅ Implemented (during creation & via assign sheet) |
-| **Teacher subjects view** | ✅ Implemented (display assigned subjects for logged-in teacher) |
-| **Enrollment (real `enrollment` table)** | ✅ Implemented |
+| Subjects catalog CRUD | ✅ Implemented (create/list/delete) |
+| Assign subjects to teachers | ✅ Implemented (during creation & via assign sheet) |
+| Teacher subjects view | ✅ Implemented (display assigned subjects for logged-in teacher) |
+| Enrollment (real `enrollment` table) | ✅ Implemented |
 | Admin student management (create/enroll/edit/move/delete) | ✅ Implemented |
 | Real class & roster counts | ✅ Implemented (enrollment-driven) |
 | Teacher dashboard / classes / roster | ✅ Implemented (real rosters; grades/attendance mock-enriched) |
 | Teacher students directory | ✅ Implemented (across assigned classes + search & filter) |
-| **Admin dashboard endpoint & stats** | ✅ Implemented (real DB counts for students, teachers, classes, subjects, sizes & enrollments) |
+| Admin dashboard endpoint & stats | ✅ Implemented (real DB counts for students, teachers, classes, subjects, sizes & enrollments) |
+| **Profile pages (Admin, Teacher, Student)** | ✅ Implemented (role-scoped editables & read-only cards) |
+| **Cloudinary pre-signed avatar upload** | ✅ Implemented (direct browser-to-Cloudinary signed upload) |
+| **Password change & security** | ✅ Implemented (Better Auth session-safe password update) |
 | Server-side pagination + search | ✅ Implemented (all lists) |
 | Modal dialogs, responsive shell, dark mode | ✅ Implemented |
 | Real `Grade`/`Attendance` DB tables | 🔜 Backlog |
-| Student area (grades/attendance/profile/classes) | 🔜 Backlog |
+| Student area (grades/attendance/classes views) | 🔜 Backlog |
 | Grades & attendance entry UIs | 🔜 Backlog |
-| Admin subjects management | 🔜 Backlog |
 | Email sender domain swap | 🔜 Backlog (approved) |
 
 ---
@@ -690,7 +726,7 @@ Nav details: Admin shows **Dashboard, Students, Teachers, Classes, Subjects** (G
 ```bash
 bun install
 bun run generate      # prisma generate
-bun run migrate       # prisma migrate dev → applies class/teacher_class (~seed) + enrollment migrations
+bun run migrate       # prisma migrate dev → applies class/teacher_class (~seed) + enrollment + subject migrations
 bun run dev           # http://localhost:3000
 ```
 
@@ -711,7 +747,7 @@ Other scripts: `bun run lint` (ESLint), `bunx tsc --noEmit` (typecheck), `bun ru
 **Users**
 - [ ] Duplicate email → `409`.
 - [ ] Duplicate emp code → `409`.
-- [ ] Teacher list shows profile fields + assigned class count.
+- [ ] Teacher list shows profile fields + assigned class count + assigned subjects count.
 
 **Students**
 - [ ] `POST /api/admin/students` creates `user` + `account` + `student` + one `enrollment`.
@@ -726,10 +762,20 @@ Other scripts: `bun run lint` (ESLint), `bunx tsc --noEmit` (typecheck), `bun ru
 - [ ] Class `studentCount` reflects real enrollments.
 - [ ] Delete cascades `teacher_class` rows.
 
+**Subjects**
+- [ ] Duplicate subject name or code → `409`.
+- [ ] `GET/POST/DELETE /api/admin/subjects` work with correct pagination and teacher counts.
+- [ ] `PUT /api/admin/teachers/[userId]/subjects` replaces qualifications atomically.
+- [ ] Teacher sees assigned subjects under `/teacher/subjects`.
+
 **Assignments**
 - [ ] `PUT /api/admin/teachers/[userId]/classes` replaces the set atomically.
 - [ ] Unknown class id → `422`; unknown teacher → `404`.
 - [ ] Teacher sees only assigned classes; unassigned class roster → `403`.
+
+**Dashboard & Directory**
+- [ ] Admin `/admin` displays live counts for students, teachers, classes, subjects, and class sizes.
+- [ ] Teacher `/teacher/students` shows all students across assigned classes with class filters.
 
 **Pagination / search**
 - [ ] All lists respect `page`, `pageSize`, `q` with correct `total`/`totalPages`.

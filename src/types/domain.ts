@@ -203,3 +203,41 @@ export interface StudentStats {
     sessionsAttended: number;
   };
 }
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: UserRole;
+  createdAt: string;
+  teacher?: {
+    empCode: string;
+    phone: string | null;
+    hireDate: string | null;
+    designation: string | null;
+    classes: Array<{ id: string; name: string; grade: number; section: string }>;
+    subjects: Array<{ id: string; name: string; code: string }>;
+  } | null;
+  student?: {
+    admissionNo: string;
+    dob: string | null;
+    gender: Gender | null;
+    address: string | null;
+    guardianName: string | null;
+    guardianPhone: string | null;
+    currentClass: { id: string; name: string; section: string | null; academicYear: string } | null;
+    enrollmentStatus: string | null;
+  } | null;
+}
+
+export interface UpdateProfileBody {
+  name?: string;
+  image?: string | null;
+  phone?: string | null;
+  dob?: string | null;
+  gender?: Gender | null;
+  address?: string | null;
+  guardianName?: string | null;
+  guardianPhone?: string | null;
+}
