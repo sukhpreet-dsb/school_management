@@ -352,6 +352,38 @@ model TeacherSubject {
   @@map("teacher_subject")
 }
 
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  EXCUSED
+  @@map("attendance_status")
+}
+
+model TeacherAttendance {
+  id             String           @id @default(uuid())
+  teacherId      String
+  teacher        Teacher          @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  date           String           // YYYY-MM-DD
+  status         AttendanceStatus @default(PRESENT)
+  checkInTime    DateTime?
+  checkOutTime   DateTime?
+  latitude       Float?
+  longitude      Float?
+  distanceMeters Float?
+  isInsideSchool Boolean          @default(false)
+  note           String?
+  markedById     String?          // User ID who marked/overrode the attendance
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([teacherId, date])
+  @@index([teacherId, date])
+  @@index([date])
+  @@map("teacher_attendance")
+}
+
 // Session / Account / Verification — Better Auth managed (do not rename).
 ```
 
@@ -363,6 +395,7 @@ erDiagram
     CLASS ||--o{ ENROLLMENT : "holds students"
     TEACHER ||--o{ TEACHER_CLASS : "owns"
     CLASS ||--o{ TEACHER_CLASS : "assigned"
+    TEACHER ||--o{ TEACHER_ATTENDANCE : "has attendance logs"
     TEACHER_CLASS }o--|| TEACHER : "teacherId"
     TEACHER_CLASS }o--|| CLASS : "classId"
     ENROLLMENT }o--|| STUDENT : "studentId"
@@ -634,9 +667,33 @@ sequenceDiagram
 
 `/teacher/classes` uses server-mode `DataTable` (`GET /api/teacher/classes`). Clicking a class goes to `/teacher/classes/[classId]` — the page re-resolves the assignment server-side (`getTeacherAssignment`) and calls `notFound()` if the class isn't theirs, then renders the roster (`GET /api/teacher/classes/[classId]/enrollments`) from **real enrollment rows**. The API independently returns **403** for unassigned classes; classes with no enrolled students show an empty state.
 
-### 9.6 Teacher dashboard
+### 9.7 Teacher Attendance & Campus Geofencing Flow
 
-`GET /api/teacher/dashboard` → `buildTeacherStats(assignedClasses)`: class list & sizes, subjects taught, grade distribution (`A+…F`), attendance rate per class, average class size. Class sizes (`studentCount`) are real enrollment counts; grades/attendance are still read from mock data keyed on `cls-{grade}-{section}` for chart enrichment.
+```mermaid
+sequenceDiagram
+    participant T as Teacher Browser
+    participant GPS as Browser Geolocation API
+    participant R as POST /api/teacher/attendance/check-in
+    participant GEO as Haversine Geofencing (src/lib/geo.ts)
+    participant DB as PostgreSQL (teacher_attendance)
+
+    T->>GPS: getCurrentPosition()
+    GPS-->>T: { latitude, longitude, accuracy }
+    T->>T: calculate live distance to campus
+    T->>R: POST { latitude, longitude, note? }
+    R->>GEO: checkCampusGeofence(lat, lng)
+    GEO-->>R: { isInside, distanceMeters }
+    R->>R: status = now > 09:30 AM ? 'LATE' : 'PRESENT'
+    R->>DB: create TeacherAttendance row (unique on [teacherId, date])
+    DB-->>R: created record
+    R-->>T: 201 TeacherAttendanceRecord
+    T->>T: show success badge + view on Google Maps link
+```
+
+### 9.8 Admin Daily Teacher Attendance & Status Override
+
+- **Daily View:** `GET /api/admin/attendance/teachers?date=YYYY-MM-DD` lists all teachers in the school roster. Teachers who marked attendance show their timestamp, status, geofence compliance, and map link; teachers without records for that date are dynamically computed as `ABSENT`.
+- **Status Override:** `PUT /api/admin/attendance/teachers` allows admins to change status (`PRESENT`, `ABSENT`, `LATE`, `HALF_DAY`, `EXCUSED`) and add/edit administrative notes (e.g. approved leaves).
 
 ---
 
@@ -664,7 +721,7 @@ flowchart LR
 
 ## 11. UI Screens & Navigation
 
-Navigation is role-based (`src/mock/nav.ts`). Admin and teacher areas also expose planned-but-empty routes as placeholders.
+Navigation is role-based (`src/mock/nav.ts`).
 
 | Area | Screen | Data source |
 |---|---|---|
@@ -673,21 +730,20 @@ Navigation is role-based (`src/mock/nav.ts`). Admin and teacher areas also expos
 | Redirect | `/` → `/dashboard` → role home | session role |
 | Admin | `/admin` Dashboard (stats & charts) | `getDbAdminStats()` (real PostgreSQL stats & totals) |
 | Admin | `/admin/teachers` Teachers + Assign classes & subjects | `/api/admin/users` + `/api/admin/teachers/*` |
-| Admin | `/admin/classes` Classes catalog + Add class | `/api/admin/classes` |
+| Admin | `/admin/classes` Classes catalog + Add/Edit/Delete class | `/api/admin/classes` |
 | Admin | `/admin/subjects` Subjects catalog + Add subject | `/api/admin/subjects` |
 | Admin | `/admin/students` Students + Add/Edit/Delete | `/api/admin/students` |
+| Admin | `/admin/attendance` Teacher Attendance (Daily & Geofence) | `/api/admin/attendance/teachers` |
 | Admin | `/admin/profile` Admin Profile & Avatar | `/api/profile` + `/api/upload/sign` |
 | Teacher | `/teacher` Dashboard | `/api/teacher/dashboard` |
 | Teacher | `/teacher/classes` My Classes | `/api/teacher/classes` |
 | Teacher | `/teacher/classes/[classId]` Roster (real) | `/api/teacher/classes/[classId]/enrollments` |
 | Teacher | `/teacher/students` Students directory | `/api/teacher/students` + `/api/teacher/classes` |
 | Teacher | `/teacher/subjects` My Subjects | `/api/teacher/subjects` |
+| Teacher | `/teacher/attendance` Check-In with GPS Geofencing | `/api/teacher/attendance/*` |
 | Teacher | `/teacher/profile` Teacher Profile & Avatar | `/api/profile` + `/api/upload/sign` |
-| Teacher | Grades · Attendance | placeholder ("Coming soon") |
 | Student | `/student/profile` Student Profile & Avatar | `/api/profile` + `/api/upload/sign` |
 | Student | `/student` stub, other `student/*` nav items | stub (not built) |
-
-Nav details: Admin shows **Dashboard, Students, Teachers, Classes, Subjects** (Grades/Attendance/Users & Roles commented out). Teacher shows **Dashboard, My Classes, Students, Grades, Attendance, Subjects**. Student nav lists Dashboard/My Grades/My Attendance/My Classes/Profile (pages are stubs).
 
 ---
 
@@ -712,9 +768,10 @@ Nav details: Admin shows **Dashboard, Students, Teachers, Classes, Subjects** (G
 | **Profile pages (Admin, Teacher, Student)** | ✅ Implemented (role-scoped editables & read-only cards) |
 | **Cloudinary pre-signed avatar upload** | ✅ Implemented (direct browser-to-Cloudinary signed upload) |
 | **Password change & security** | ✅ Implemented (Better Auth session-safe password update) |
+| **Teacher Attendance & Campus Geofencing** | ✅ Implemented (PostgreSQL + GPS Geofencing + Admin Daily Roster) |
 | Server-side pagination + search | ✅ Implemented (all lists) |
 | Modal dialogs, responsive shell, dark mode | ✅ Implemented |
-| Real `Grade`/`Attendance` DB tables | 🔜 Backlog |
+| Real Student `Grade`/`Attendance` DB tables | 🔜 Backlog |
 | Student area (grades/attendance/classes views) | 🔜 Backlog |
 | Grades & attendance entry UIs | 🔜 Backlog |
 | Email sender domain swap | 🔜 Backlog (approved) |

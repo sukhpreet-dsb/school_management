@@ -1,16 +1,14 @@
-import { CalendarDays } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
-import { ComingSoon } from '@/components/shared/coming-soon';
+import { TeacherAttendanceManager } from '@/components/teacher/teacher-attendance-manager';
 
 export default function TeacherAttendancePage() {
   return (
     <>
-      <PageHeader title='Attendance' description='Mark and review class attendance.' />
-      <ComingSoon
-        icon={CalendarDays}
-        title='Attendance tracking'
-        description='Mark daily attendance for your classes. Coming in a future module.'
+      <PageHeader
+        title='Teacher Attendance'
+        description='Mark your daily check-in with campus geofencing and view attendance history.'
       />
+      <TeacherAttendanceManager />
     </>
   );
 }

@@ -2,19 +2,30 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetcher } from '@/lib/api';
-import type { CreateStudentBody, CreateUserBody, UpdateStudentBody, UpdateTeacherBody } from '@/types/api';
 import type {
+  AdminDailyTeacherAttendance,
   AdminStats,
+  AdminTeacherAttendanceItem,
   AuthUser,
   ClassCatalogItem,
   Paginated,
   Student,
   Subject,
+  TeacherAttendanceRecord,
   TeacherClassSummary,
   TeacherStats,
+  TeacherTodayAttendance,
   UpdateProfileBody,
   UserProfile
 } from '@/types/domain';
+import type {
+  AdminUpdateTeacherAttendanceBody,
+  CreateStudentBody,
+  CreateUserBody,
+  TeacherCheckInBody,
+  UpdateStudentBody,
+  UpdateTeacherBody
+} from '@/types/api';
 
 export type SubjectWithTeacherCount = Subject & { teacherCount: number };
 
@@ -352,5 +363,65 @@ export function useDeleteStudent() {
     mutationFn: (studentId: string) =>
       fetcher<{ id: string }>(`/api/admin/students/${studentId}`, { method: 'DELETE' }),
     onSuccess: () => invalidateStudentData(queryClient)
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Teacher Attendance Queries & Mutations
+// ---------------------------------------------------------------------------
+
+export function useTeacherTodayAttendance() {
+  return useQuery({
+    queryKey: ['teacher', 'attendance', 'today'],
+    queryFn: () => fetcher<TeacherTodayAttendance>('/api/teacher/attendance/today')
+  });
+}
+
+export function useTeacherAttendanceHistory() {
+  return useQuery({
+    queryKey: ['teacher', 'attendance', 'history'],
+    queryFn: () => fetcher<TeacherAttendanceRecord[]>('/api/teacher/attendance/history')
+  });
+}
+
+export function useTeacherCheckIn() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: TeacherCheckInBody) =>
+      fetcher<TeacherAttendanceRecord>('/api/teacher/attendance/check-in', {
+        method: 'POST',
+        body
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'attendance'] });
+    }
+  });
+}
+
+export function useAdminTeacherAttendance(date?: string) {
+  const params = new URLSearchParams();
+  if (date) params.set('date', date);
+  const queryStr = params.toString() ? `?${params.toString()}` : '';
+
+  return useQuery({
+    queryKey: ['admin', 'attendance', 'teachers', date || 'today'],
+    queryFn: () =>
+      fetcher<AdminDailyTeacherAttendance>(`/api/admin/attendance/teachers${queryStr}`)
+  });
+}
+
+export function useAdminUpdateTeacherAttendance() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AdminUpdateTeacherAttendanceBody) =>
+      fetcher<AdminTeacherAttendanceItem>('/api/admin/attendance/teachers', {
+        method: 'PUT',
+        body
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'attendance'] });
+    }
   });
 }

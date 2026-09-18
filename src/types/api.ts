@@ -67,3 +67,16 @@ export interface UpdateClassBody {
   section?: string;
   room?: string | null;
 }
+
+export interface TeacherCheckInBody {
+  latitude?: number;
+  longitude?: number;
+  note?: string;
+}
+
+export interface AdminUpdateTeacherAttendanceBody {
+  teacherId: string;
+  date: string; // YYYY-MM-DD
+  status: import('./domain').AttendanceStatus;
+  note?: string | null;
+}

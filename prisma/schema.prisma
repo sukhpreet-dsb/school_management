@@ -40,6 +40,7 @@ model Teacher {
   updatedAt   DateTime      @updatedAt
   classes     TeacherClass[]
   subjects    TeacherSubject[]
+  attendances TeacherAttendance[]
 
   @@map("teacher")
 }
@@ -59,6 +60,39 @@ model Student {
   enrollments   Enrollment[]
 
   @@map("student")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  EXCUSED
+
+  @@map("attendance_status")
+}
+
+model TeacherAttendance {
+  id             String           @id @default(uuid())
+  teacherId      String
+  teacher        Teacher          @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  date           DateTime         @db.Date
+  status         AttendanceStatus @default(PRESENT)
+  checkInTime    DateTime?
+  checkOutTime   DateTime?
+  latitude       Float?
+  longitude      Float?
+  distanceMeters Float?
+  isInsideSchool Boolean          @default(false)
+  note           String?
+  markedById     String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([teacherId, date])
+  @@index([date])
+  @@index([teacherId, date])
+  @@map("teacher_attendance")
 }
 
 enum Gender {

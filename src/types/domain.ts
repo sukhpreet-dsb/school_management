@@ -2,7 +2,7 @@ export type UserRole = 'admin' | 'teacher' | 'student';
 
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 export type EnrollmentStatus = 'ACTIVE' | 'TRANSFERRED' | 'GRADUATED' | 'DROPPED';
-export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
+export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED';
 export type LetterGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
 export type Term = 1 | 2 | 3;
 
@@ -240,4 +240,69 @@ export interface UpdateProfileBody {
   address?: string | null;
   guardianName?: string | null;
   guardianPhone?: string | null;
+}
+
+export interface TeacherAttendanceRecord {
+  id: string;
+  teacherId: string;
+  teacherUserId: string;
+  teacherName: string;
+  teacherEmail: string;
+  empCode?: string | null;
+  date: string; // YYYY-MM-DD
+  status: AttendanceStatus;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  distanceMeters: number | null;
+  isInsideSchool: boolean;
+  note: string | null;
+  markedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeacherTodayAttendance {
+  hasCheckedIn: boolean;
+  record: TeacherAttendanceRecord | null;
+  schoolConfig: {
+    latitude: number;
+    longitude: number;
+    radiusMeters: number;
+    name: string;
+  };
+}
+
+export interface AdminTeacherAttendanceItem {
+  teacherId: string;
+  userId: string;
+  name: string;
+  email: string;
+  empCode: string | null;
+  phone: string | null;
+  status: AttendanceStatus;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  distanceMeters: number | null;
+  isInsideSchool: boolean;
+  note: string | null;
+  attendanceId: string | null;
+}
+
+export interface AdminDailyTeacherAttendance {
+  date: string;
+  summary: {
+    totalTeachers: number;
+    present: number;
+    absent: number;
+    late: number;
+    halfDay: number;
+    excused: number;
+    insideCampusCount: number;
+    outsideCampusCount: number;
+  };
+  records: AdminTeacherAttendanceItem[];
 }

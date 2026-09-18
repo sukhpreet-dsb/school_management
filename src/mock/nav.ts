@@ -26,8 +26,8 @@ export const NAV: Record<UserRole, NavItem[]> = {
     { title: 'Teachers', href: '/admin/teachers', icon: Users },
     { title: 'Classes', href: '/admin/classes', icon: School },
     { title: 'Subjects', href: '/admin/subjects', icon: BookOpen },
+    { title: 'Attendance', href: '/admin/attendance', icon: CalendarDays },
     // { title: 'Grades', href: '/admin/grades', icon: BarChart3 },
-    // { title: 'Attendance', href: '/admin/attendance', icon: CalendarDays },
     // { title: 'Users & Roles', href: '/admin/users', icon: ClipboardList },
     // { title: 'Settings', href: '/admin/settings', icon: Settings }
   ],
